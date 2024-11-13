@@ -22,9 +22,11 @@
             </intent-filter>
         </activity>
         <activity android:name=".MainActivity" android:exported="true" />
-        <activity android:name=".screens.RegisterActivity" android:exported="false" />
-        <activity android:name=".screens.HomePageActivity" android:exported="false" />
-        <activity android:name=".screens.SignInActivity" android:exported="false" />
+        <activity android:name=".screens.RegisterScreen" android:exported="true" />
+        <activity android:name=".screens.HomePage" android:exported="true" />
+        <activity android:name=".screens.SignInScreen" android:exported="true" />
+        <activity android:name=".screens.ProfileActivity"
+            android:theme="@style/Theme.Slngify_kp"/>
     </application>
 
 </manifest>

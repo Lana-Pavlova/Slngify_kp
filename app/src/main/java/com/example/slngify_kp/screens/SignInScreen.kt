@@ -40,11 +40,11 @@ import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.ui.theme.Slngify_kp
 import androidx.appcompat.app.AppCompatActivity
 
-class SignInActivity : AppCompatActivity() {
+class SignInScreen : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            SignInScreen(
+            SignInActivity(
                 onSignInClick = { email, password ->
                     // Handle sign-in logic
                 },
@@ -62,7 +62,7 @@ class SignInActivity : AppCompatActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SignInScreen(
+fun SignInActivity(
     onSignInClick: (String, String) -> Unit,
     onRegisterClick: (String) -> Unit,
     onForgotPasswordClick: () -> Unit
@@ -250,7 +250,7 @@ fun SignInScreen(
 @Composable
 fun SignInScreenPreview() {
     Slngify_kp {
-        SignInScreen(
+        SignInActivity(
             onSignInClick = { _, _ -> },
             onRegisterClick = {},
             onForgotPasswordClick = {}

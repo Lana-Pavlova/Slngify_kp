@@ -15,11 +15,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.ui.theme.Slngify_kp
 
-class RegisterActivity : AppCompatActivity() {
+class RegisterScreen : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            RegisterScreen(
+            RegisterActivity(
                 initialEmail = "",
                 onRegister = { email, password ->
                     // Handle registration logic
@@ -32,7 +32,7 @@ class RegisterActivity : AppCompatActivity() {
     }
 }
 @Composable
-fun RegisterScreen(
+fun RegisterActivity(
     initialEmail: String,
     onRegister: (String, String) -> Unit,  // Return email and password
     onBackClick: () -> Unit
@@ -125,7 +125,7 @@ fun RegisterScreen(
 @Composable
 fun RegisterScreenPreview() {
     Slngify_kp {
-        RegisterScreen(
+        RegisterActivity(
             initialEmail = "example@mail.com",
             onRegister = { email, password ->
                 // Handle registration logic; for preview, this can be empty

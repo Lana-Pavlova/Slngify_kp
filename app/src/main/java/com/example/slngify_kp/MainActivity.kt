@@ -18,55 +18,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MyApp()
-        }
-    }
-}
-
-@Composable
-fun MyApp() {
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.HomePage) }
-    var emailFromRegistration by remember { mutableStateOf("") }
-
-    Slngify_kp {
-        when (currentScreen) {
-            is Screen.HomePage -> {
-                HomePage()
-            }
-            is Screen.SignIn -> {
-                SignInScreen(
-                    onSignInClick = { email, password ->
-                        // Handle sign-in logic, e.g., authenticate user
-                        currentScreen = Screen.HomePage
-                    },
-                    onRegisterClick = { initialEmail ->
-                        emailFromRegistration = initialEmail
-                        currentScreen = Screen.Register
-                    },
-                    onForgotPasswordClick = {
-                        // Handle forgot password logic
-                    }
-                )
-            }
-            is Screen.Register -> {
-                RegisterScreen(
-                    initialEmail = emailFromRegistration,
-                    onRegister = { email, password ->
-                        // Handle successful registration
-                        emailFromRegistration = email
-                        currentScreen = Screen.HomePage
-                    },
-                    onBackClick = {
-                        currentScreen = Screen.SignIn
-                    }
-                )
+            Slngify_kp {
+                HomePage()  // HomePage как основной интерфейс
             }
         }
     }
-}
-
-sealed class Screen {
-    object HomePage : Screen()
-    object SignIn : Screen()
-    object Register : Screen()
 }

@@ -16,12 +16,12 @@ import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.Slngify_kp
 
-class HomePageActivity : AppCompatActivity() {
+class HomePage : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             Slngify_kp {
-                HomePage()
+                HomePageActivity()
             }
         }
     }
@@ -29,7 +29,7 @@ class HomePageActivity : AppCompatActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomePage() {
+fun HomePageActivity() {
     Scaffold(
         topBar = {
             TopAppBar(
