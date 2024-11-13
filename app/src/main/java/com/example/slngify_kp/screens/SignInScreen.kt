@@ -1,6 +1,7 @@
 package com.example.slngify_kp.screens
 
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.ui.theme.Slngify_kp
 import androidx.appcompat.app.AppCompatActivity
 
-class SignInScreen : AppCompatActivity() {
+class SignInScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {

@@ -21,12 +21,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MainActivity" android:exported="true" />
-        <activity android:name=".screens.RegisterScreen" android:exported="true" />
-        <activity android:name=".screens.HomePage" android:exported="true" />
-        <activity android:name=".screens.SignInScreen" android:exported="true" />
-        <activity android:name=".screens.ProfileActivity"
-            android:theme="@style/Theme.Slngify_kp"/>
+        <activity android:name=".screens.HomePageActivity" />
+        <activity android:name=".screens.RegisterScreen" />
+        <activity android:name=".screens.SignInScreen" />
+        <activity android:name=".screens.ProfileActivity" />
     </application>
 
 </manifest>

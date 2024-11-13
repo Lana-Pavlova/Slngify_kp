@@ -16,6 +16,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.example.slngify_kp.screens.HomePageActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.slngify_kp.ui.theme.Slngify_kp
@@ -29,7 +30,7 @@ class SplashActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             delay(3000) // Задержка в 3 секунды
-            startActivity(Intent(this@SplashActivity, MainActivity::class.java))
+            startActivity(Intent(this@SplashActivity, HomePageActivity ::class.java))
             finish() // Закрываем SplashActivity
         }
     }
