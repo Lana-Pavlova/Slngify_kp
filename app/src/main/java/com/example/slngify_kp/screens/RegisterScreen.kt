@@ -1,5 +1,8 @@
 package com.example.slngify_kp.screens
 
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -12,7 +15,22 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.ui.theme.Slngify_kp
 
-
+class RegisterActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            RegisterScreen(
+                initialEmail = "",
+                onRegister = { email, password ->
+                    // Handle registration logic
+                },
+                onBackClick = {
+                    // Handle back navigation
+                }
+            )
+        }
+    }
+}
 @Composable
 fun RegisterScreen(
     initialEmail: String,

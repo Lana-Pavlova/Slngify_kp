@@ -1,5 +1,7 @@
 package com.example.slngify_kp.screens
 
+import android.os.Bundle
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +38,26 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.slngify_kp.ui.theme.Slngify_kp
+import androidx.appcompat.app.AppCompatActivity
+
+class SignInActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            SignInScreen(
+                onSignInClick = { email, password ->
+                    // Handle sign-in logic
+                },
+                onRegisterClick = { initialEmail ->
+                    // Handle register navigation
+                },
+                onForgotPasswordClick = {
+                    // Handle forgot password logic
+                }
+            )
+        }
+    }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
