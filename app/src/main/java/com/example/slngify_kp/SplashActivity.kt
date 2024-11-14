@@ -1,13 +1,20 @@
 package com.example.slngify_kp
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,20 +24,23 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.slngify_kp.screens.HomePageActivity
+import com.example.slngify_kp.ui.theme.MyTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.slngify_kp.ui.theme.Slngify_kp
 
+@SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            SplashScreen()
+            MyTheme {
+                SplashScreen()
+            }
         }
 
         lifecycleScope.launch {
             delay(3000) // Задержка в 3 секунды
-            startActivity(Intent(this@SplashActivity, HomePageActivity ::class.java))
+            startActivity(Intent(this@SplashActivity, HomePageActivity::class.java))
             finish() // Закрываем SplashActivity
         }
     }
@@ -67,7 +77,7 @@ fun SplashScreen() {
 @Preview(showBackground = true)
 @Composable
 fun SplashScreenPreview() {
-    Slngify_kp {
+    MyTheme {
         SplashScreen()
     }
 }

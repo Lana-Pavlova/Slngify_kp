@@ -1,5 +1,8 @@
 package com.example.slngify_kp.screens
 
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -44,7 +47,18 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
-import com.example.slngify_kp.ui.theme.Slngify_kp
+import com.example.slngify_kp.ui.theme.MyTheme
+
+class ProfilePageActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MyTheme {
+                NavigationComponent()
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +73,7 @@ fun ProfilePage(navController: NavController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }
@@ -248,7 +262,7 @@ fun StatisticsSection() {
 @Preview(showBackground = true)
 @Composable
 fun ProfilePagePreview() {
-    Slngify_kp {
+    MyTheme {
         val navController = rememberNavController() // Создаем фиктивный NavController
         ProfilePage(navController) // Передаем navController в ProfilePage
     }

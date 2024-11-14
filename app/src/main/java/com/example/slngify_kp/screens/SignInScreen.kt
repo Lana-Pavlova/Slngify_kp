@@ -38,7 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.slngify_kp.ui.theme.Slngify_kp
+import com.example.slngify_kp.ui.theme.MyTheme
 import androidx.appcompat.app.AppCompatActivity
 
 class SignInScreen : ComponentActivity() {
@@ -250,7 +250,7 @@ fun SignInActivity(
 @Preview(showBackground = true)
 @Composable
 fun SignInScreenPreview() {
-    Slngify_kp {
+    MyTheme {
         SignInActivity(
             onSignInClick = { _, _ -> },
             onRegisterClick = {},

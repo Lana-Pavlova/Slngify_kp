@@ -15,7 +15,6 @@ import androidx.navigation.NavController
 import com.example.slngify_kp.R
 import androidx.navigation.compose.rememberNavController
 
-
 class DictionaryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

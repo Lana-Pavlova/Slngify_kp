@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.slngify_kp.ui.theme.Slngify_kp
+import com.example.slngify_kp.ui.theme.MyTheme
 
 class RegisterScreen : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,7 +125,7 @@ fun RegisterActivity(
 @Preview(showBackground = true)
 @Composable
 fun RegisterScreenPreview() {
-    Slngify_kp {
+    MyTheme {
         RegisterActivity(
             initialEmail = "example@mail.com",
             onRegister = { email, password ->

@@ -10,11 +10,11 @@
         android:label="@string/app_name"
         android:roundIcon="@drawable/goose"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Slngify_kp"
+        android:theme="@style/Theme.MyTheme"
         tools:targetApi="31">
         <activity
             android:name=".SplashActivity"
-            android:theme="@style/Theme.Slngify_kp"
+            android:theme="@style/Theme.MyTheme"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,7 +24,7 @@
         <activity android:name=".screens.HomePageActivity" />
         <activity android:name=".screens.RegisterScreen" />
         <activity android:name=".screens.SignInScreen" />
-        <activity android:name=".screens.ProfileActivity" />
+        <activity android:name=".screens.ProfilePageActivity" />
     </application>
 
 </manifest>
