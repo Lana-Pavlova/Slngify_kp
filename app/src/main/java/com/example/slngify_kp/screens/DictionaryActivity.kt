@@ -39,7 +39,7 @@ fun DictionaryScreen(navController: NavController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }

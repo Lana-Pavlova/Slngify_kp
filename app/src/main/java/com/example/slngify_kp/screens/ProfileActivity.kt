@@ -313,23 +313,6 @@ fun RatingSection() {
     }
 }
 
-//@Composable
-//fun ProgressSection() {
-//    Column(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-//            .padding(16.dp)
-//    ) {
-//        Text(text = "Прогресс обучения", style = MaterialTheme.typography.bodyLarge)
-//        Spacer(modifier = Modifier.height(8.dp))
-//        LinearProgressIndicator(
-//            progress = 0.5f,
-//            modifier = Modifier.fillMaxWidth(),
-//        )
-//    }
-//}
-
 @Composable
 fun StatisticsSection() {
     Column(

@@ -32,11 +32,9 @@ class PracticeActivity : ComponentActivity() {
                     composable("sectionsList") { SectionsScreen(navController) }
                     composable("sectionDetail/{sectionTitle}") { backStackEntry ->
                         val sectionTitle = backStackEntry.arguments?.getString("sectionTitle")
-//                        sectionTitle?.let { SectionDetailScreen(it) }
                         if (sectionTitle != null) {
                             LessonDetailScreen(navController, sectionTitle)
                         } else {
-                            // Обработка ошибки: sectionTitle не должен быть null
                             Text("Ошибка: заголовок задания не найден")
                         }
                     }
@@ -58,7 +56,7 @@ fun SectionsScreen(navController: NavController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }
@@ -136,7 +134,7 @@ fun SectionDetailScreen(navController: NavController, sectionTitle: String) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует, иначе используйте Icons.Default.ArrowBack
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }

@@ -59,7 +59,7 @@ fun LessonsScreen(navController: NavController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }
@@ -112,7 +112,7 @@ fun LessonDetailScreen(navController: NavController, lessonTitle: String) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            painter = painterResource(id = R.drawable.back), // Убедитесь, что иконка существует, иначе используйте Icons.Default.ArrowBack
+                            painter = painterResource(id = R.drawable.back),
                             contentDescription = "Назад"
                         )
                     }
@@ -140,7 +140,7 @@ fun LessonDetailScreen(navController: NavController, lessonTitle: String) {
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // Здесь можно добавить дополнительный контент, например, изображения, видео и т.д.
+                // дополнительный контент
             }
         }
     )
