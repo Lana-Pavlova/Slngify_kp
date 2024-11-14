@@ -55,10 +55,29 @@ fun NavigationComponent() {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = "home") {
         composable("home") { HomePageScreen(navController) }
+        composable("lessonsList") { LessonsScreen(navController) }
+        composable("sectionsList") { SectionsScreen(navController) }
         composable("dictionaryPage") { DictionaryScreen(navController) }
         composable("profilePage") { ProfilePage(navController) }
+        composable("lessonDetail/{lessonTitle}") { backStackEntry ->
+            val lessonTitle = backStackEntry.arguments?.getString("lessonTitle")
+            if (lessonTitle != null) {
+                LessonDetailScreen(navController, lessonTitle)
+            } else {
+                Text("Ошибка: заголовок урока не найден")
+            }
+        }
+        composable("sectionDetail/{sectionTitle}") { backStackEntry ->
+            val sectionTitle = backStackEntry.arguments?.getString("sectionTitle")
+            if (sectionTitle != null) {
+                SectionDetailScreen(navController, sectionTitle)
+            } else {
+                Text("Ошибка: заголовок раздела не найден")
+            }
+        }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomePageScreen(navController: NavController) {
@@ -117,10 +136,14 @@ fun HomePageScreen(navController: NavController) {
                     MainMenuButton("Словарь", R.drawable.dictionary) {
                         navController.navigate("dictionaryPage") // Переход на страницу словаря
                     }
-                    MainMenuButton("Уроки", R.drawable.lessons) { /* TODO: Handle click */ }
-                    MainMenuButton("Практика", R.drawable.practice) { /* TODO: Handle click */ }
+                    MainMenuButton("Уроки", R.drawable.lessons) {
+                    navController.navigate("lessonsList") // Переход на страницу уроков
+                }
+                    MainMenuButton("Практика", R.drawable.practice){
+                        navController.navigate("sectionsList") // Переход на страницу заданий
+                }
                     MainMenuButton("Личный кабинет", R.drawable.profile) {
-                        navController.navigate("profilePage")
+                        navController.navigate("profilePage") // Переход на страницу профиля
                     }
                 }
             }

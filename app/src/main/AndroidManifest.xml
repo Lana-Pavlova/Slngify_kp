@@ -6,9 +6,9 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/goose"
+        android:icon="@drawable/goosewht"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/goose"
+        android:roundIcon="@drawable/goosewht"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyTheme"
         tools:targetApi="31">
@@ -22,8 +22,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".screens.HomePageActivity" />
-        <activity android:name=".screens.RegisterScreen" />
-        <activity android:name=".screens.SignInScreen" />
         <activity android:name=".screens.ProfilePageActivity" />
     </application>
 

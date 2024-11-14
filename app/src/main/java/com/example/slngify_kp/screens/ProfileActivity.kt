@@ -48,6 +48,11 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 class ProfilePageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +70,7 @@ class ProfilePageActivity : ComponentActivity() {
 fun ProfilePage(navController: NavController) {
     var showAuthorInfo by remember { mutableStateOf(false) }
     var showAuthForm by remember { mutableStateOf(false) }
+    var isRegistering by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -89,7 +95,8 @@ fun ProfilePage(navController: NavController) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ProfileHeader()
@@ -105,20 +112,22 @@ fun ProfilePage(navController: NavController) {
                     Text("Зарегистрироваться или Авторизоваться")
                 }
                 if (showAuthForm) {
-                    AuthForm()
+                    if (isRegistering) {
+                        RegistrationForm()
+                    } else {
+                        AuthForm(onRegisterClick = { isRegistering = true })
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 StatisticsSection()
                 Spacer(modifier = Modifier.height(16.dp))
-                ProgressSection()
+//                ProgressSection()
                 Spacer(modifier = Modifier.height(16.dp))
                 RatingSection()
             }
         }
     )
-
 }
-
 @Composable
 fun ProfileHeader() {
     Column(
@@ -173,7 +182,7 @@ fun AuthorInfo() {
 }
 
 @Composable
-fun AuthForm() {
+fun AuthForm(onRegisterClick: () -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -194,7 +203,8 @@ fun AuthForm() {
             value = password,
             onValueChange = { password = it },
             label = { Text("Пароль") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
         )
         Spacer(modifier = Modifier.height(8.dp))
         Button(
@@ -203,9 +213,80 @@ fun AuthForm() {
         ) {
             Text("Войти")
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(onClick = onRegisterClick) {
+            Text("Создать аккаунт")
+        }
     }
 }
+@Composable
+fun RegistrationForm() {
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
+    val isFormValid = firstName.isNotBlank() && lastName.isNotBlank() && email.isNotBlank() &&
+            password.isNotBlank() && password == confirmPassword
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .padding(16.dp)
+    ) {
+        TextField(
+            value = firstName,
+            onValueChange = { firstName = it },
+            label = { Text("Имя") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = firstName.isBlank()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = lastName,
+            onValueChange = { lastName = it },
+            label = { Text("Фамилия") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = lastName.isBlank()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Почта") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Пароль") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = password.isBlank(),
+            visualTransformation = PasswordVisualTransformation()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it },
+            label = { Text("Подтверждение пароля") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = confirmPassword.isBlank() || confirmPassword != password,
+            visualTransformation = PasswordVisualTransformation()
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = { /* TODO: Handle registration */ },
+            enabled = isFormValid,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Зарегистрироваться")
+        }
+    }
+}
 @Composable
 fun RatingSection() {
     Column(
@@ -214,35 +295,40 @@ fun RatingSection() {
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
-        Text(text = "Рейтинг пользователей", style = MaterialTheme.typography.bodyLarge)
+        Text(text = "Рейтинг пользователей", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(8.dp))
-        val users = listOf(
-            "Иван Иванов - 1500 очков",
-            "Анна Смирнова - 1400 очков",
-            "Петр Петров - 1300 очков"
+
+        // Топ пользователей
+        val topUsers = listOf(
+            "1. Иван Иванов - 1500 очков",
+            "2. Анна Смирнова - 1400 очков",
+            "3. Петр Петров - 1300 очков"
         )
-        users.forEach { user ->
+        topUsers.forEach { user ->
             Text(text = user, style = MaterialTheme.typography.bodyMedium)
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "Ваша позиция: 5-е место", style = MaterialTheme.typography.bodyMedium)
     }
 }
 
-@Composable
-fun ProgressSection() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .padding(16.dp)
-    ) {
-        Text(text = "Прогресс обучения", style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(8.dp))
-        LinearProgressIndicator(
-            progress = 0.5f,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
+//@Composable
+//fun ProgressSection() {
+//    Column(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+//            .padding(16.dp)
+//    ) {
+//        Text(text = "Прогресс обучения", style = MaterialTheme.typography.bodyLarge)
+//        Spacer(modifier = Modifier.height(8.dp))
+//        LinearProgressIndicator(
+//            progress = 0.5f,
+//            modifier = Modifier.fillMaxWidth(),
+//        )
+//    }
+//}
 
 @Composable
 fun StatisticsSection() {
@@ -252,10 +338,18 @@ fun StatisticsSection() {
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
-        Text(
-            text = "Статистика по выполненным заданиям: 10 из 20",
-            style = MaterialTheme.typography.bodyLarge
+        Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Пример круговой диаграммы
+        CircularProgressIndicator(
+            progress = 0.5f,
+            modifier = Modifier.size(100.dp),
+            strokeWidth = 8.dp
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "Выполнено 10 из 20 заданий", style = MaterialTheme.typography.bodyMedium)
     }
 }
 

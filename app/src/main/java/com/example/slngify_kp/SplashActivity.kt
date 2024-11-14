@@ -39,7 +39,7 @@ class SplashActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            delay(3000) // Задержка в 3 секунды
+            delay(5000) // Задержка в 2,5 секунды
             startActivity(Intent(this@SplashActivity, HomePageActivity::class.java))
             finish() // Закрываем SplashActivity
         }
