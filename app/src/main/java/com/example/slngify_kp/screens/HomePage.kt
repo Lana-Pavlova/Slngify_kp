@@ -24,6 +24,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -37,6 +43,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
+import com.example.slngify_kp.WordOfTheDayWidget
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.tasks.await
+import androidx.compose.material3.CircularProgressIndicator
+import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.Source
+
+data class WordOfTheDay(
+    val word: String = "",
+    val definition: String = "",
+    val examples: String = "",
+    val translation: String = "",
+    val addedDate: Long = 0
+)
 
 class HomePageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,6 +80,7 @@ fun NavigationComponent() {
         composable("sectionsList") { SectionsScreen(navController) }
         composable("dictionaryPage") { DictionaryScreen(navController) }
         composable("profilePage") { ProfilePage(navController) }
+        composable("register") { RegistrationForm(navController) } // Add this line
         composable("lessonDetail/{lessonTitle}") { backStackEntry ->
             val lessonTitle = backStackEntry.arguments?.getString("lessonTitle")
             if (lessonTitle != null) {
@@ -77,10 +99,52 @@ fun NavigationComponent() {
         }
     }
 }
+suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
+    return try {
+        // Get the total number of documents
+        val totalDocs = Firebase.firestore.collection("wordOfTheDay")
+            .count()
+            .get(AggregateSource.SERVER)
+            .await()
+            .count
 
+        if (totalDocs == 0L) return null // Handle empty collection
+
+        // Efficient random selection:
+        val randomIndex = (0 until totalDocs).random()
+
+        val querySnapshot = Firebase.firestore.collection("wordOfTheDay")
+            .orderBy("word") // Order by any field (for consistent ordering)
+            .startAt(randomIndex.toDouble()) // Start at a random position. Ordering is key for fairness here.
+            .limit(1)
+            .get()
+            .await()
+
+        querySnapshot.documents.firstOrNull()?.toObject(WordOfTheDay::class.java)
+    } catch (e: Exception) {
+        println("Error fetching random word: ${e.message}")
+        null
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomePageScreen(navController: NavController) {
+    var wordOfTheDay by remember { mutableStateOf<WordOfTheDay?>(null) }
+    var isLoading by remember { mutableStateOf(true) } //This line was missing
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        isLoading = true
+        try {
+            wordOfTheDay = fetchRandomWordOfTheDay()
+        } catch (e: Exception) {
+            error = e.message ?: "An unexpected error occurred."
+        } finally {
+            isLoading = false
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,33 +163,39 @@ fun HomePageScreen(navController: NavController) {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Добро пожаловать!",
-                    style = MaterialTheme.typography.displayLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
-                Text(
-                    text = "✨ Слово дня: \"Lit\" ✨\nозначает что-то потрясающее или невероятное.",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.primary, // Используем основной цвет темы
-                        fontWeight = FontWeight.Bold
-                    ),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(vertical = 16.dp)
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer, // Цвета из темы
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                )
+                if (isLoading) {
+                    CircularProgressIndicator()
+                } else if (error != null) {
+                    Text("Error: $error")
+                } else {
+                    wordOfTheDay?.let { word ->
+                        Text(
+                            text = "✨ Слово дня: ${word.word} ✨\n${word.definition}",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
                             ),
-                            shape = RoundedCornerShape(8.dp)
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(vertical = 16.dp)
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(16.dp)
                         )
-                        .padding(16.dp)
-                )
+                        if (word.examples.isNotBlank()) {
+                            Text("Примеры: ${word.examples}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } ?: run {
+                        Text("No word found.")
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -176,6 +246,7 @@ fun MainMenuButton(text: String, iconRes: Int, onClick: () -> Unit) {
 @Composable
 fun HomePagePreview() {
     MyTheme {
+        WordOfTheDayWidget()
         val navController = rememberNavController()
         HomePageScreen(navController)
     }
