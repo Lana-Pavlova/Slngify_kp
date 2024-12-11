@@ -49,7 +49,6 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 import androidx.compose.material3.CircularProgressIndicator
 import com.google.firebase.firestore.AggregateSource
-import com.google.firebase.firestore.Source
 
 data class WordOfTheDay(
     val word: String = "",
@@ -80,7 +79,6 @@ fun NavigationComponent() {
         composable("sectionsList") { SectionsScreen(navController) }
         composable("dictionaryPage") { DictionaryScreen(navController) }
         composable("profilePage") { ProfilePage(navController) }
-        composable("register") { RegistrationForm(navController) } // Add this line
         composable("lessonDetail/{lessonTitle}") { backStackEntry ->
             val lessonTitle = backStackEntry.arguments?.getString("lessonTitle")
             if (lessonTitle != null) {
@@ -101,7 +99,6 @@ fun NavigationComponent() {
 }
 suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
     return try {
-        // Get the total number of documents
         val totalDocs = Firebase.firestore.collection("wordOfTheDay")
             .count()
             .get(AggregateSource.SERVER)
@@ -114,8 +111,8 @@ suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
         val randomIndex = (0 until totalDocs).random()
 
         val querySnapshot = Firebase.firestore.collection("wordOfTheDay")
-            .orderBy("word") // Order by any field (for consistent ordering)
-            .startAt(randomIndex.toDouble()) // Start at a random position. Ordering is key for fairness here.
+            .orderBy("word") // order by any field
+            .startAt(randomIndex.toInt()) // start at a random position
             .limit(1)
             .get()
             .await()
@@ -130,7 +127,7 @@ suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
 @Composable
 fun HomePageScreen(navController: NavController) {
     var wordOfTheDay by remember { mutableStateOf<WordOfTheDay?>(null) }
-    var isLoading by remember { mutableStateOf(true) } //This line was missing
+    var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -170,7 +167,7 @@ fun HomePageScreen(navController: NavController) {
                 } else {
                     wordOfTheDay?.let { word ->
                         Text(
-                            text = "✨ Слово дня: ${word.word} ✨\n${word.definition}",
+                            text = "✨ Слово дня: ${word.word} ✨\n${word.definition}\nПеревод: ${word.translation}",
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold

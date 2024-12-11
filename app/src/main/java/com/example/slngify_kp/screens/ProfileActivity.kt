@@ -23,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -53,6 +52,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.runtime.*
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import android.util.Patterns
 
 class ProfilePageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -183,7 +189,7 @@ fun AuthorInfo() {
 
 @Composable
 fun AuthForm(onRegisterClick: () -> Unit) {
-    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
     Column(
@@ -193,9 +199,9 @@ fun AuthForm(onRegisterClick: () -> Unit) {
             .padding(16.dp)
     ) {
         TextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Имя пользователя") },
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Почта") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -214,7 +220,7 @@ fun AuthForm(onRegisterClick: () -> Unit) {
             Text("Войти")
         }
         Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onRegisterClick) {
+        TextButton(onClick = onRegisterClick){
             Text("Создать аккаунт")
         }
     }
@@ -226,9 +232,14 @@ fun RegistrationForm() {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    val auth = Firebase.auth
+    val scope = rememberCoroutineScope()
 
     val isFormValid = firstName.isNotBlank() && lastName.isNotBlank() && email.isNotBlank() &&
-            password.isNotBlank() && password == confirmPassword
+            password.isNotBlank() && password == confirmPassword &&
+            Patterns.EMAIL_ADDRESS.matcher(email).matches()
 
     Column(
         modifier = Modifier
@@ -241,7 +252,8 @@ fun RegistrationForm() {
             onValueChange = { firstName = it },
             label = { Text("Имя") },
             modifier = Modifier.fillMaxWidth(),
-            isError = firstName.isBlank()
+            isError = firstName.isBlank(),
+            supportingText = { if (firstName.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -249,7 +261,8 @@ fun RegistrationForm() {
             onValueChange = { lastName = it },
             label = { Text("Фамилия") },
             modifier = Modifier.fillMaxWidth(),
-            isError = lastName.isBlank()
+            isError = lastName.isBlank(),
+            supportingText = { if (lastName.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -257,7 +270,8 @@ fun RegistrationForm() {
             onValueChange = { email = it },
             label = { Text("Почта") },
             modifier = Modifier.fillMaxWidth(),
-            isError = email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+            isError = !Patterns.EMAIL_ADDRESS.matcher(email).matches(),
+            supportingText = { if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) Text("Неверный формат почты", color = MaterialTheme.colorScheme.error) else null }
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -266,7 +280,8 @@ fun RegistrationForm() {
             label = { Text("Пароль") },
             modifier = Modifier.fillMaxWidth(),
             isError = password.isBlank(),
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            supportingText = { if (password.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -275,15 +290,44 @@ fun RegistrationForm() {
             label = { Text("Подтверждение пароля") },
             modifier = Modifier.fillMaxWidth(),
             isError = confirmPassword.isBlank() || confirmPassword != password,
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            supportingText = { if (confirmPassword.isBlank() || confirmPassword != password) Text("Пароли не совпадают", color = MaterialTheme.colorScheme.error) else null }
         )
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(
-            onClick = { /* TODO: Handle registration */ },
+            onClick = {
+                scope.launch {
+                    if (isFormValid) {
+                        try {
+                            val userCredential = auth.createUserWithEmailAndPassword(email, password).await()
+                            val user = userCredential.user
+                            val userDocRef = Firebase.firestore.collection("users").document(user?.uid!!)
+                            userDocRef.set(mapOf(
+                                "firstName" to firstName,
+                                "lastName" to lastName,
+                                "email" to email,
+                                "password" to password
+                            )).await()
+                            showError = false
+                            errorMessage = ""
+                        } catch (e: Exception) {
+                            showError = true
+                            errorMessage = e.message ?: "Registration failed"
+                        }
+                    } else {
+                        showError = true
+                        errorMessage = "Please fill in all fields correctly"
+                    }
+                }
+            },
             enabled = isFormValid,
             modifier = Modifier.align(Alignment.End)
         ) {
             Text("Зарегистрироваться")
+        }
+        if (showError) {
+            Text(errorMessage, color = MaterialTheme.colorScheme.error)
         }
     }
 }
