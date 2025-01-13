@@ -187,18 +187,22 @@ fun SectionDetailScreen(sectionId: String, navController: NavHostController) {
         db.collection("sections").document(sectionId)
             .get()
             .addOnSuccessListener { document ->
-                val questionsData = document.get("questions") as? List<Map<*, *>> ?: emptyList()
-                val questionList = questionsData.map { questionData ->
-                    Question(
-                        type = questionData["type"] as? String ?: "",
-                        text = questionData["text"] as? String ?: "",
-                        options = questionData["options"] as? List<String> ?: emptyList(),
-                        correctAnswer = questionData["correctAnswer"] as? String ?: "",
-                        imageUrl = questionData["imageUrl"] as? String ?: ""
-                    )
+                Log.d("SectionDetailScreen", "Document ${document.data}") // Added log
+                if(document.data != null){
+                    val questionsData = document.get("questions") as? List<Map<*, *>> ?: emptyList()
+                    val questionList = questionsData.map { questionData ->
+                        Question(
+                            type = questionData["type"] as? String ?: "",
+                            text = questionData["text"] as? String ?: "",
+                            options = questionData["options"] as? List<String> ?: emptyList(),
+                            correctAnswer = questionData["correctAnswer"] as? String ?: "",
+                            imageUrl = questionData["imageUrl"] as? String ?: ""
+                        )
+                    }
+                    questions = questionList
+                    Log.d("SectionDetailScreen", "questions: $questions")
                 }
-                questions = questionList
-                Log.d("SectionDetailScreen", "questions: $questions")
+
             }
             .addOnFailureListener { e ->
                 Log.e("SectionDetailScreen", "Error getting questions", e)
@@ -475,6 +479,8 @@ fun QuestionScreen(
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(16.dp) )
     }
 }
+
+
 private fun updateUserProgress(
     sectionId: String,
     correctAnswers: Int,

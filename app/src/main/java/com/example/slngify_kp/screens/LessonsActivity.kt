@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,7 +76,9 @@ data class LessonSection(
 data class Lesson(
     val lessonTitle: String, // Заголовок из sectionA
     val sections: List<Pair<String, LessonSection>>,
-    val sectionIds : List<String>?
+    val sectionIds : List<String>?,
+    val practiceSectionId: String = ""
+
 )
 data class LessonListItem(
     val id: String,
@@ -165,6 +168,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
     val scrollState = rememberScrollState()
     var lessonTitle by remember { mutableStateOf<String?>(null) }
 
+
     LaunchedEffect(lessonDocumentId) {
         val db = Firebase.firestore
         db.collection("lessons").document(lessonDocumentId)
@@ -172,7 +176,9 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
             .addOnSuccessListener { document ->
                 val sectionA = document.get("sectionA") as? Map<*, *>
                 val lessonTitle = sectionA?.get("content") as? String ?: "Урок"
+                val practiceSectionId = document.getString("practiceSectionId") ?: ""
                 Log.d("LessonScreen", "lessonTitle: $lessonTitle")
+                Log.d("LessonScreen", "practiceSectionId: $practiceSectionId") // <-- Added log
 
                 val lessonSections = mutableListOf<Pair<String, LessonSection>>()
                 val sectionIds = document.get("sectionIds") as? List<String> ?: emptyList()
@@ -198,13 +204,16 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                 lesson = Lesson(
                     lessonTitle = lessonTitle ?: "Урок",
                     sections = lessonSections,
-                    sectionIds = sectionIds
+                    sectionIds = sectionIds,
+                    practiceSectionId = practiceSectionId
                 )
             }
             .addOnFailureListener { e ->
                 Log.e("LessonScreen", "Error getting lesson", e)
             }
     }
+
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -262,11 +271,23 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                         )
                     }
                 }
+
+                if (!lessonData.practiceSectionId.isNullOrBlank()) {
+                    Button(
+                        onClick = {
+                            if (!lessonData.practiceSectionId.isNullOrBlank()){
+                                navController.navigate("sectionDetail/${lessonData.practiceSectionId}")
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(text = "Перейти к практике")
+                    }
+                }
             }
         }
     }
 }
-
 @Preview(showBackground = true)
 @Composable
 fun LessonsScreenPreview() {
