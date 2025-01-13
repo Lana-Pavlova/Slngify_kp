@@ -20,17 +20,20 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
 
         </activity>
         <activity android:name=".screens.HomePageActivity" />
         <activity android:name=".screens.ProfilePageActivity" />
 
-        <meta-data
-            android:name="android.appwidget.provider"
-            android:resource="@xml/widget_info" />
-
+        <receiver android:name=".widget.WordOfTheDayWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/word_of_the_day_widget_info"/>
+        </receiver>
     </application>
 
 </manifest>

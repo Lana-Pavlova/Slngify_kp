@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.exoplayer)
     implementation(libs.exoplayer.ui)
     implementation(libs.coil.compose)
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     implementation(libs.androidx.glance.appwidget.v110)
     implementation(libs.androidx.glance.material3)

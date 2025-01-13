@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "515116768848",
+    "project_id": "slangify-fd9e6",
+    "storage_bucket": "slangify-fd9e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:515116768848:android:958c3d84f9c6aeaeaabb55",
+        "android_client_info": {
+          "package_name": "com.example.slngify_kp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG70yYa--1_b0a1el-MpSHUok94rDLwSc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

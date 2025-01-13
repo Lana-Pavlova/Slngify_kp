@@ -48,6 +48,7 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 import androidx.compose.material3.CircularProgressIndicator
+import com.example.slngify_kp.widget.WordOfTheDayWidget
 import com.google.firebase.firestore.AggregateSource
 
 data class WordOfTheDay(
@@ -64,6 +65,8 @@ class HomePageActivity : ComponentActivity() {
                 NavigationComponent()
             }
         }
+        WordOfTheDayWidget.updateWidget(this)
+
     }
 }
 
