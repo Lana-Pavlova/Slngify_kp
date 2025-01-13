@@ -1,10 +1,13 @@
 package com.example.slngify_kp.screens
 
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,12 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Checkbox
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -26,10 +29,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,8 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,18 +54,11 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.runtime.*
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import android.util.Patterns
 
 class ProfilePageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,12 +71,39 @@ class ProfilePageActivity : ComponentActivity() {
     }
 }
 
+data class UserProgress(
+    val completedLessons: List<String> = emptyList(),
+    val completedSections: List<String> = emptyList(),
+    val sectionProgress: Map<String, Int> = emptyMap(),
+    val lastVisitedSection: String? = null,
+    val lastVisitedLesson: String? = null
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfilePage(navController: NavController) {
     var showAuthorInfo by remember { mutableStateOf(false) }
     var showAuthForm by remember { mutableStateOf(false) }
     var isRegistering by remember { mutableStateOf(false) }
+    var userProgress by remember { mutableStateOf(UserProgress()) }
+    var userName by remember { mutableStateOf("Your name") }
+    var userEmail by remember { mutableStateOf("your@email.com") }
+    val userId = Firebase.auth.currentUser?.uid
+    val context = LocalContext.current
+    LaunchedEffect(userId) {
+        val auth = Firebase.auth
+        val currentUser = auth.currentUser
+
+        if (currentUser != null) {
+            userName = currentUser.displayName ?: "Имя пользователя"
+            userEmail = currentUser.email ?: "email"
+            loadUserProgress { progress ->
+                userProgress = progress
+            }
+
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -105,13 +132,27 @@ fun ProfilePage(navController: NavController) {
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ProfileHeader()
+                ProfileHeader(name = userName, email = userEmail)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { showAuthorInfo = !showAuthorInfo }) {
                     Text("Сведения об авторе")
                 }
                 if (showAuthorInfo) {
-                    AuthorInfo()
+                    AuthorInfo(
+                        initialName = userName,
+                        initialEmail = userEmail,
+                        onSave = { name, email, updateName, updateEmail ->
+                            updateUserData(name, email, updateName, updateEmail) { success, message ->
+                                if (success) {
+                                    userName = name
+                                    userEmail = email
+                                    Toast.makeText(context, "Данные успешно обновлены", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { showAuthForm = !showAuthForm }) {
@@ -119,7 +160,7 @@ fun ProfilePage(navController: NavController) {
                 }
                 if (showAuthForm) {
                     if (isRegistering) {
-                        RegistrationForm()
+                        RegistrationForm(onRegisterComplete = { isRegistering = false })
                     } else {
                         AuthForm(onRegisterClick = { isRegistering = true })
                     }
@@ -127,15 +168,20 @@ fun ProfilePage(navController: NavController) {
                 Spacer(modifier = Modifier.height(16.dp))
                 StatisticsSection()
                 Spacer(modifier = Modifier.height(16.dp))
-//                ProgressSection()
+                ProgressSection(userProgress = userProgress)
                 Spacer(modifier = Modifier.height(16.dp))
-                RatingSection()
+                Button(onClick = {
+                    signOutUser(navController)
+                }) {
+                    Text(text = "Выйти")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     )
 }
 @Composable
-fun ProfileHeader() {
+fun ProfileHeader(name : String, email : String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -152,37 +198,58 @@ fun ProfileHeader() {
                 .background(Color.LightGray)
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Иван Иванов", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("ivan@example.com", style = MaterialTheme.typography.bodyMedium)
+        Text(text = name, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(text = email, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
 @Composable
-fun AuthorInfo() {
+fun AuthorInfo(
+    initialName: String,
+    initialEmail: String,
+    onSave: (String, String, Boolean, Boolean) -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var email by remember { mutableStateOf(initialEmail) }
+    val context = LocalContext.current
+    var updateName by remember { mutableStateOf(false) }
+    var updateEmail by remember { mutableStateOf(false) }
+
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
+        TextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Имя") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        TextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Почта") },
+            modifier = Modifier.fillMaxWidth()
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.Person,
-                contentDescription = "Имя",
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Имя: Иван Иванов", style = MaterialTheme.typography.bodyMedium)
+            Checkbox(checked = updateName, onCheckedChange = { updateName = it })
+            Text(text = "Изменить имя")
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = updateEmail, onCheckedChange = { updateEmail = it })
+            Text(text = "Изменить почту")
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.Email,
-                contentDescription = "Email",
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Почта: ivan@example.com", style = MaterialTheme.typography.bodyMedium)
+        Button(
+            onClick = {
+                onSave(name, email, updateName, updateEmail)
+            },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("Сохранить")
         }
     }
 }
@@ -191,6 +258,9 @@ fun AuthorInfo() {
 fun AuthForm(onRegisterClick: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -213,33 +283,43 @@ fun AuthForm(onRegisterClick: () -> Unit) {
             visualTransformation = PasswordVisualTransformation()
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = { /* TODO: Handle login */ },
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Text("Войти")
+        if (errorMessage != null) {
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onRegisterClick){
-            Text("Создать аккаунт")
+        if (isLoading){
+            CircularProgressIndicator()
+        } else {
+            Button(
+                onClick = {
+                    isLoading = true
+                    loginUser(email, password) { success, message ->
+                        isLoading = false
+                        if (success) {
+                            Toast.makeText(context, "Вход выполнен", Toast.LENGTH_SHORT).show()
+                        } else {
+                            errorMessage = message
+                        }
+                    }
+                },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Войти")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = onRegisterClick) {
+                Text("Создать аккаунт")
+            }
         }
+
     }
 }
 @Composable
-fun RegistrationForm() {
-    var firstName by remember { mutableStateOf("") }
-    var lastName by remember { mutableStateOf("") }
+fun RegistrationForm(onRegisterComplete: () -> Unit){
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var showError by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
-    val auth = Firebase.auth
-    val scope = rememberCoroutineScope()
-
-    val isFormValid = firstName.isNotBlank() && lastName.isNotBlank() && email.isNotBlank() &&
-            password.isNotBlank() && password == confirmPassword &&
-            Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -248,30 +328,10 @@ fun RegistrationForm() {
             .padding(16.dp)
     ) {
         TextField(
-            value = firstName,
-            onValueChange = { firstName = it },
-            label = { Text("Имя") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = firstName.isBlank(),
-            supportingText = { if (firstName.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(
-            value = lastName,
-            onValueChange = { lastName = it },
-            label = { Text("Фамилия") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = lastName.isBlank(),
-            supportingText = { if (lastName.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Почта") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = !Patterns.EMAIL_ADDRESS.matcher(email).matches(),
-            supportingText = { if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) Text("Неверный формат почты", color = MaterialTheme.colorScheme.error) else null }
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
         TextField(
@@ -279,113 +339,291 @@ fun RegistrationForm() {
             onValueChange = { password = it },
             label = { Text("Пароль") },
             modifier = Modifier.fillMaxWidth(),
-            isError = password.isBlank(),
-            visualTransformation = PasswordVisualTransformation(),
-            supportingText = { if (password.isBlank()) Text("Поле не может быть пустым", color = MaterialTheme.colorScheme.error) else null }
+            visualTransformation = PasswordVisualTransformation()
         )
         Spacer(modifier = Modifier.height(8.dp))
-        TextField(
-            value = confirmPassword,
-            onValueChange = { confirmPassword = it },
-            label = { Text("Подтверждение пароля") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = confirmPassword.isBlank() || confirmPassword != password,
-            visualTransformation = PasswordVisualTransformation(),
-            supportingText = { if (confirmPassword.isBlank() || confirmPassword != password) Text("Пароли не совпадают", color = MaterialTheme.colorScheme.error) else null }
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                scope.launch {
-                    if (isFormValid) {
-                        try {
-                            val userCredential = auth.createUserWithEmailAndPassword(email, password).await()
-                            val user = userCredential.user
-                            val userDocRef = Firebase.firestore.collection("users").document(user?.uid!!)
-                            userDocRef.set(mapOf(
-                                "firstName" to firstName,
-                                "lastName" to lastName,
-                                "email" to email,
-                                "password" to password
-                            )).await()
-                            showError = false
-                            errorMessage = ""
-                        } catch (e: Exception) {
-                            showError = true
-                            errorMessage = e.message ?: "Registration failed"
+        if (errorMessage != null) {
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+        }
+        if (isLoading){
+            CircularProgressIndicator()
+        }else {
+            Button(
+                onClick = {
+                    isLoading = true
+                    registerUser(email, password) { success, message ->
+                        isLoading = false
+                        if (success) {
+                            Toast.makeText(context, "Аккаунт создан", Toast.LENGTH_SHORT).show()
+                            onRegisterComplete()
+                        } else {
+                            errorMessage = message
                         }
-                    } else {
-                        showError = true
-                        errorMessage = "Please fill in all fields correctly"
                     }
-                }
-            },
-            enabled = isFormValid,
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Text("Зарегистрироваться")
+                },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Зарегистрироваться")
+            }
         }
-        if (showError) {
-            Text(errorMessage, color = MaterialTheme.colorScheme.error)
-        }
+
     }
 }
-@Composable
-fun RatingSection() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .padding(16.dp)
-    ) {
-        Text(text = "Рейтинг пользователей", style = MaterialTheme.typography.headlineSmall)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Топ пользователей
-        val topUsers = listOf(
-            "1. Иван Иванов - 1500 очков",
-            "2. Анна Смирнова - 1400 очков",
-            "3. Петр Петров - 1300 очков"
-        )
-        topUsers.forEach { user ->
-            Text(text = user, style = MaterialTheme.typography.bodyMedium)
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Ваша позиция: 5-е место", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
 @Composable
 fun StatisticsSection() {
+    var userProgress by remember { mutableStateOf<UserProgress?>(null) }
+    var progress by remember { mutableStateOf(0f) }
+    var totalSections by remember { mutableStateOf(0) }
+    val userId = Firebase.auth.currentUser?.uid
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            loadUserProgress() { progress ->
+                userProgress = progress
+            }
+            loadTotalSections() { total ->
+                totalSections = total
+            }
+        }
+    }
+
+    if (userProgress != null) {
+        val completedSections = userProgress!!.completedSections.size
+        val totalCorrectAnswers = userProgress!!.sectionProgress.values.sum()
+        progress = if (totalSections > 0) completedSections.toFloat() / totalSections else 0f
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                .padding(16.dp)
+        ) {
+            Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier.size(100.dp),
+                    strokeWidth = 8.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleLarge)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = "Пройдено $completedSections из $totalSections разделов", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+fun ProgressSection(userProgress: UserProgress) {
+    val db = Firebase.firestore
+    var lessonTitles by remember { mutableStateOf(mapOf<String, String>()) }
+    val userId = Firebase.auth.currentUser?.uid
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            loadLessonTitles(userProgress.completedLessons) { titles ->
+                lessonTitles = titles
+            }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
-        Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
+        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
+        val totalCorrectAnswers = userProgress.sectionProgress.values.sum()
+        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
+        Text("Правильных ответов: $totalCorrectAnswers", style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(8.dp))
-
-        // Пример круговой диаграммы
-        CircularProgressIndicator(
-            progress = 0.5f,
-            modifier = Modifier.size(100.dp),
-            strokeWidth = 8.dp
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "Выполнено 10 из 20 заданий", style = MaterialTheme.typography.bodyMedium)
+        if (userProgress.completedSections.isNotEmpty()) {
+            Text("Пройденные разделы:", style = MaterialTheme.typography.titleMedium)
+            userProgress.completedSections.forEach { sectionId ->
+                Text(text = "Раздел $sectionId")
+            }
+        }
     }
 }
+private fun loadUserProgress(onProgressLoaded: (UserProgress) -> Unit) {
+    val userId = Firebase.auth.currentUser?.uid ?: "testUser"
+    val db = Firebase.firestore
+    val userRef = db.collection("users").document(userId)
+
+    userRef.get()
+        .addOnSuccessListener { document ->
+            val userProgress = document.toObject(UserProgress::class.java) ?: UserProgress()
+            onProgressLoaded(userProgress)
+            Log.d("StatisticsSection", "User progress loaded successfully: $userProgress")
+        }
+        .addOnFailureListener { e ->
+            Log.e("StatisticsSection", "Error loading user progress", e)
+        }
+}
+private fun loadLessonTitles(lessonIds: List<String>, onTitlesLoaded: (Map<String, String>) -> Unit) {
+    if (lessonIds.isEmpty()) {
+        onTitlesLoaded(emptyMap())
+        return
+    }
+    val db = Firebase.firestore
+    val lessonRef = db.collection("lessons")
+    val lessonTitles = mutableMapOf<String, String>()
+
+    lessonRef.whereIn(FieldPath.documentId(), lessonIds).get()
+        .addOnSuccessListener { querySnapshot ->
+            for (document in querySnapshot.documents){
+                val lessonId = document.id
+                val lessonTitle = document.getString("lessonTitle")
+                if (lessonTitle != null) {
+                    lessonTitles[lessonId] = lessonTitle
+                }
+            }
+            onTitlesLoaded(lessonTitles)
+            Log.d("ProgressSection", "Lessons titles loaded successfully: $lessonTitles")
+
+        }.addOnFailureListener { e ->
+            Log.e("ProgressSection", "Error loading lessons", e)
+        }
+}
+
+private fun loadTotalSections(onTotalLoaded: (Int) -> Unit) {
+    val db = Firebase.firestore
+    db.collection("sections")
+        .get()
+        .addOnSuccessListener { querySnapshot ->
+            onTotalLoaded(querySnapshot.size())
+            Log.d("StatisticsSection", "Total sections loaded successfully: ${querySnapshot.size()}")
+        }
+        .addOnFailureListener { e ->
+            Log.e("StatisticsSection", "Error loading total sections", e)
+        }
+}
+private fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    val auth = Firebase.auth
+    val db = Firebase.firestore
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = task.result.user
+                user?.let {
+                    val userDocRef = db.collection("users").document(it.uid)
+                    userDocRef.set(mapOf(
+                        "email" to email,
+                    )).addOnCompleteListener {
+                        if(it.isSuccessful){
+                            onComplete(true, null)
+                        } else {
+                            onComplete(false, it.exception?.message ?: "Failed to add user data" )
+                        }
+                    }
+                }
+
+            } else {
+                val errorMessage = task.exception?.message ?: "Ошибка регистрации"
+                onComplete(false, errorMessage)
+            }
+        }
+}
+
+private fun loginUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+    val auth = Firebase.auth
+    auth.signInWithEmailAndPassword(email, password)
+        .addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                Log.d("ProfilePage", "User login successful")
+                onComplete(true, null)
+            } else {
+                val errorMessage = task.exception?.message ?: "Ошибка входа"
+                Log.e("ProfilePage", "User login failed: $errorMessage")
+                onComplete(false, errorMessage)
+            }
+        }
+}
+private fun signOutUser(navController: NavController){
+    val auth = Firebase.auth
+    auth.signOut()
+    navController.navigate("home"){
+        popUpTo(0)
+    }
+}
+
+private fun updateUserData(
+    name: String,
+    email: String,
+    updateName: Boolean,
+    updateEmail: Boolean,
+    onComplete: (Boolean, String?) -> Unit
+) {
+    val auth = Firebase.auth
+    val user = auth.currentUser
+
+    user?.let {
+        isEmailUnique(email) { isUnique ->
+            if (isUnique || !updateEmail) {
+                if (updateEmail) {
+                    it.updateEmail(email).addOnCompleteListener { taskEmail ->
+                        if (taskEmail.isSuccessful) {
+                            val profileUpdates = UserProfileChangeRequest.Builder()
+                                .setDisplayName(name)
+                                .build()
+
+                            if (updateName) {
+                                it.updateProfile(profileUpdates).addOnCompleteListener { taskName ->
+                                    // ... (rest of the updateUserData function)
+                                }
+                            } else {
+                                // ... (handling the case without updating the name)
+                            }
+                        } else {
+                            onComplete(false, "Ошибка при обновлении почты: ${taskEmail.exception?.message}")
+                        }
+                    }
+                } else {
+                    val profileUpdates = UserProfileChangeRequest.Builder()
+                        .setDisplayName(name)
+                        .build()
+                    if (updateName) {
+                        it.updateProfile(profileUpdates).addOnCompleteListener { taskName ->
+                            if (taskName.isSuccessful) {
+                                // ... (Update Firestore)
+                            } else {
+                                onComplete(false, "Ошибка при обновлении имени: ${taskName.exception?.message}")
+                            }
+                        }
+                    } else {
+                        onComplete(true, null)
+                    }
+                }
+            } else {
+                onComplete(false, "Данный email уже используется")
+            }
+        }
+    }
+}
+
+private fun isEmailUnique(email: String, onResult: (Boolean) -> Unit) {
+        val db = Firebase.firestore
+        db.collection("users")
+            .whereEqualTo("email", email)
+            .get()
+            .addOnCompleteListener { task ->
+                if(task.isSuccessful){
+                    val querySnapshot = task.result
+                    onResult(querySnapshot.isEmpty)
+                } else {
+                    onResult(false)
+                }
+            }
+    }
 
 @Preview(showBackground = true)
 @Composable
 fun ProfilePagePreview() {
     MyTheme {
-        val navController = rememberNavController() // Создаем фиктивный NavController
-        ProfilePage(navController) // Передаем navController в ProfilePage
+        val navController = rememberNavController()
+        ProfilePage(navController)
     }
 }
 

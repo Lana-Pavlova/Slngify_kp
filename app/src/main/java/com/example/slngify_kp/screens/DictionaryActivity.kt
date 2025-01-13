@@ -52,7 +52,7 @@ class DictionaryActivity : ComponentActivity() {
             MaterialTheme {
                 Surface {
                     val navController = rememberNavController()
-                    DictionaryScreen(navController) // Передаем navController
+                    DictionaryScreen(navController)
                 }
             }
         }
@@ -140,7 +140,10 @@ suspend fun fetchWordTranslations(): List<WordTranslation> {
         val querySnapshot = Firebase.firestore.collection("wordOfTheDay").get().await()
         querySnapshot.documents.mapNotNull { document ->
             val wordOfTheDay = document.toObject(WordOfTheDay::class.java)
-            wordOfTheDay?.let { WordTranslation(it.word, it.translation) }
+            wordOfTheDay?.let { it.translation?.let { it1 -> it.word?.let { it2 ->
+                WordTranslation(
+                    it2, it1)
+            } } }
         }
     } catch (e: Exception) {
         println("Error fetching word translations: ${e.message}")
@@ -148,7 +151,7 @@ suspend fun fetchWordTranslations(): List<WordTranslation> {
     }
 }
 @Composable
-fun DictionaryItem(wordPair: WordTranslation) { // Changed to accept WordTranslation
+fun DictionaryItem(wordPair: WordTranslation) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

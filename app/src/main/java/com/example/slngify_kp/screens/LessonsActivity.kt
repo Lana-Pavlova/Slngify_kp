@@ -1,13 +1,8 @@
 package com.example.slngify_kp.screens
 
-import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,8 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,51 +23,30 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import coil.compose.AsyncImage
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+
 data class LessonSection(
     val content: String?,
     val imageUrl: String?
 )
 data class Lesson(
-    val lessonTitle: String, // Заголовок из sectionA
+    val lessonTitle: String,
     val sections: List<Pair<String, LessonSection>>,
     val sectionIds : List<String>?,
     val practiceSectionId: String = ""
@@ -82,7 +54,7 @@ data class Lesson(
 )
 data class LessonListItem(
     val id: String,
-    val lessonTitle: String, // Используем content из sectionA
+    val lessonTitle: String,
     val sectionCount: Int
 )
 
@@ -156,7 +128,6 @@ fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostControl
             .fillMaxSize()
             .padding(16.dp)) {
             Text(text = "Lesson: ${lessonItem.lessonTitle}")
-            Text(text = "Sections: ${lessonItem.sectionCount}")
         }
     }
 }
@@ -178,7 +149,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                 val lessonTitle = sectionA?.get("content") as? String ?: "Урок"
                 val practiceSectionId = document.getString("practiceSectionId") ?: ""
                 Log.d("LessonScreen", "lessonTitle: $lessonTitle")
-                Log.d("LessonScreen", "practiceSectionId: $practiceSectionId") // <-- Added log
+                Log.d("LessonScreen", "practiceSectionId: $practiceSectionId")
 
                 val lessonSections = mutableListOf<Pair<String, LessonSection>>()
                 val sectionIds = document.get("sectionIds") as? List<String> ?: emptyList()
@@ -272,10 +243,10 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                     }
                 }
 
-                if (!lessonData.practiceSectionId.isNullOrBlank()) {
+                if (lessonData.practiceSectionId.isNotBlank()) {
                     Button(
                         onClick = {
-                            if (!lessonData.practiceSectionId.isNullOrBlank()){
+                            if (lessonData.practiceSectionId.isNotBlank()){
                                 navController.navigate("sectionDetail/${lessonData.practiceSectionId}")
                             }
                         },

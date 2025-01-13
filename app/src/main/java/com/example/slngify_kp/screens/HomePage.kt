@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,13 +51,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import com.google.firebase.firestore.AggregateSource
 
 data class WordOfTheDay(
-    val word: String = "",
-    val definition: String = "",
-    val examples: String = "",
-    val translation: String = "",
-    val addedDate: Long = 0
+    val definition : String? = null,
+    val examples : String? = null,
+    val translation : String? = null,
+    val word : String? = null
 )
-
 class HomePageActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,30 +93,18 @@ fun NavigationComponent() {
 }
 suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
     return try {
-        val totalDocs = Firebase.firestore.collection("wordOfTheDay")
-            .count()
-            .get(AggregateSource.SERVER)
-            .await()
-            .count
-
-        if (totalDocs == 0L) return null // Handle empty collection
-
-        // Efficient random selection:
-        val randomIndex = (0 until totalDocs).random()
-
         val querySnapshot = Firebase.firestore.collection("wordOfTheDay")
-            .orderBy("word") // order by any field
-            .startAt(randomIndex.toInt()) // start at a random position
-            .limit(1)
             .get()
             .await()
 
-        querySnapshot.documents.firstOrNull()?.toObject(WordOfTheDay::class.java)
+        if (querySnapshot.isEmpty) return null
+
+        val randomIndex = (0 until querySnapshot.size()).random()
+        querySnapshot.documents[randomIndex].toObject(WordOfTheDay::class.java)
     } catch (e: Exception) {
         println("Error fetching random word: ${e.message}")
         null
     }
-
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,11 +113,13 @@ fun HomePageScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    var isWordAvailable by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         isLoading = true
         try {
             wordOfTheDay = fetchRandomWordOfTheDay()
+            isWordAvailable = wordOfTheDay != null
         } catch (e: Exception) {
             error = e.message ?: "An unexpected error occurred."
         } finally {
@@ -157,10 +146,17 @@ fun HomePageScreen(navController: NavController) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator()
-                } else if (error != null) {
-                    Text("Error: $error")
-                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center){
+                        CircularProgressIndicator()
+                    }
+                }
+                else if (error != null) {
+                    Text(text = "Error: $error", style = MaterialTheme.typography.bodyMedium)
+                }
+                else if (!isWordAvailable) {
+                    Text("No word found.")
+                }
+                else {
                     wordOfTheDay?.let { word ->
                         Text(
                             text = "✨ Слово дня: ${word.word} ✨\n${word.definition}\nПеревод: ${word.translation}",
@@ -181,19 +177,16 @@ fun HomePageScreen(navController: NavController) {
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .padding(16.dp)
-                            )
-                        if (word.examples.isNotBlank()) {
+                        )
+                        if (!word.examples.isNullOrBlank()) {
                             Text(
-                                "Примеры: ${word.examples}",
+                                text = "Примеры: ${word.examples}",
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
-
                             )
                         }
-                    } ?: run {
-                        Text("No word found.")
                     }
                 }
 
@@ -204,23 +197,22 @@ fun HomePageScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     MainMenuButton("Словарь", R.drawable.dictionary) {
-                        navController.navigate("dictionaryPage") // Переход на страницу словаря
+                        navController.navigate("dictionaryPage")
                     }
                     MainMenuButton("Уроки", R.drawable.lessons) {
-                    navController.navigate("lessonsList") // Переход на страницу уроков
-                }
+                        navController.navigate("lessonsList")
+                    }
                     MainMenuButton("Практика", R.drawable.practice){
-                        navController.navigate("sectionsList") // Переход на страницу заданий
-                }
+                        navController.navigate("sectionsList")
+                    }
                     MainMenuButton("Личный кабинет", R.drawable.profile) {
-                        navController.navigate("profilePage") // Переход на страницу профиля
+                        navController.navigate("profilePage")
                     }
                 }
             }
         }
     )
 }
-
 @Composable
 fun MainMenuButton(text: String, iconRes: Int, onClick: () -> Unit) {
     Column(
