@@ -43,7 +43,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
-import com.example.slngify_kp.WordOfTheDayWidget
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
@@ -79,21 +78,17 @@ fun NavigationComponent() {
         composable("sectionsList") { SectionsScreen(navController) }
         composable("dictionaryPage") { DictionaryScreen(navController) }
         composable("profilePage") { ProfilePage(navController) }
-        composable("lessonDetail/{lessonTitle}") { backStackEntry ->
-            val lessonTitle = backStackEntry.arguments?.getString("lessonTitle")
-            if (lessonTitle != null) {
-                LessonDetailScreen(navController, lessonTitle)
-            } else {
-                Text("Ошибка: заголовок урока не найден")
-            }
+        composable("lessonDetail/{lessonDocumentId}") { backStackEntry ->
+            val lessonDocumentId = backStackEntry.arguments?.getString("lessonDocumentId") ?: ""
+            LessonScreen(lessonDocumentId = lessonDocumentId, navController = navController)
         }
-        composable("sectionDetail/{sectionTitle}") { backStackEntry ->
-            val sectionTitle = backStackEntry.arguments?.getString("sectionTitle")
-            if (sectionTitle != null) {
-                SectionDetailScreen(navController, sectionTitle)
-            } else {
-                Text("Ошибка: заголовок раздела не найден")
-            }
+        composable("sectionDetail/{sectionId}") { backStackEntry ->
+            val sectionId = backStackEntry.arguments?.getString("sectionId") ?: ""
+            SectionDetailScreen(sectionId = sectionId, navController = navController)
+        }
+        composable("imageViewer/{imageUrl}") { backStackEntry ->
+            val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
+            ImageViewerScreen(imageUrl = imageUrl, navController = navController)
         }
     }
 }
@@ -122,6 +117,7 @@ suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
         println("Error fetching random word: ${e.message}")
         null
     }
+
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,9 +181,16 @@ fun HomePageScreen(navController: NavController) {
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .padding(16.dp)
-                        )
+                            )
                         if (word.examples.isNotBlank()) {
-                            Text("Примеры: ${word.examples}", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Примеры: ${word.examples}",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                            )
                         }
                     } ?: run {
                         Text("No word found.")
@@ -243,7 +246,6 @@ fun MainMenuButton(text: String, iconRes: Int, onClick: () -> Unit) {
 @Composable
 fun HomePagePreview() {
     MyTheme {
-        WordOfTheDayWidget()
         val navController = rememberNavController()
         HomePageScreen(navController)
     }
