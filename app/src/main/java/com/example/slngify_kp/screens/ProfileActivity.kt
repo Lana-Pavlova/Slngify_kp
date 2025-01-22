@@ -35,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,13 +51,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
@@ -74,9 +75,7 @@ class ProfilePageActivity : ComponentActivity() {
 data class UserProgress(
     val completedLessons: List<String> = emptyList(),
     val completedSections: List<String> = emptyList(),
-    val sectionProgress: Map<String, Int> = emptyMap(),
-    val lastVisitedSection: String? = null,
-    val lastVisitedLesson: String? = null
+    val sectionProgress: Map<String, Int> = emptyMap()
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,11 +84,14 @@ fun ProfilePage(navController: NavController) {
     var showAuthorInfo by remember { mutableStateOf(false) }
     var showAuthForm by remember { mutableStateOf(false) }
     var isRegistering by remember { mutableStateOf(false) }
-    var userProgress by remember { mutableStateOf(UserProgress()) }
     var userName by remember { mutableStateOf("Your name") }
     var userEmail by remember { mutableStateOf("your@email.com") }
     val userId = Firebase.auth.currentUser?.uid
     val context = LocalContext.current
+    val viewModel: LessonsViewModel = viewModel()
+    val userProgress by viewModel.userProgress.collectAsState()
+    val lessonList by viewModel.lessonList.collectAsState()
+
     LaunchedEffect(userId) {
         val auth = Firebase.auth
         val currentUser = auth.currentUser
@@ -97,10 +99,6 @@ fun ProfilePage(navController: NavController) {
         if (currentUser != null) {
             userName = currentUser.displayName ?: "Имя пользователя"
             userEmail = currentUser.email ?: "email"
-            loadUserProgress { progress ->
-                userProgress = progress
-            }
-
         }
     }
 
@@ -166,8 +164,11 @@ fun ProfilePage(navController: NavController) {
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                StatisticsSection()
-                Spacer(modifier = Modifier.height(16.dp))
+                if(lessonList.isNotEmpty()){
+                    StatisticsSection(userProgress, lessonList.size)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 ProgressSection(userProgress = userProgress)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = {
@@ -370,63 +371,10 @@ fun RegistrationForm(onRegisterComplete: () -> Unit){
     }
 }
 @Composable
-fun StatisticsSection() {
-    var userProgress by remember { mutableStateOf<UserProgress?>(null) }
+fun StatisticsSection(userProgress: UserProgress, totalLessons: Int) {
     var progress by remember { mutableStateOf(0f) }
-    var totalSections by remember { mutableStateOf(0) }
-    val userId = Firebase.auth.currentUser?.uid
-
-    LaunchedEffect(userId) {
-        if (userId != null) {
-            loadUserProgress() { progress ->
-                userProgress = progress
-            }
-            loadTotalSections() { total ->
-                totalSections = total
-            }
-        }
-    }
-
-    if (userProgress != null) {
-        val completedSections = userProgress!!.completedSections.size
-        val totalCorrectAnswers = userProgress!!.sectionProgress.values.sum()
-        progress = if (totalSections > 0) completedSections.toFloat() / totalSections else 0f
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                .padding(16.dp)
-        ) {
-            Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier.size(100.dp),
-                    strokeWidth = 8.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleLarge)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Пройдено $completedSections из $totalSections разделов", style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-@Composable
-fun ProgressSection(userProgress: UserProgress) {
-    val db = Firebase.firestore
-    var lessonTitles by remember { mutableStateOf(mapOf<String, String>()) }
-    val userId = Firebase.auth.currentUser?.uid
-
-    LaunchedEffect(userId) {
-        if (userId != null) {
-            loadLessonTitles(userProgress.completedLessons) { titles ->
-                lessonTitles = titles
-            }
-        }
+    LaunchedEffect(userProgress, totalLessons){
+        progress = if (totalLessons > 0) userProgress.completedLessons.size.toFloat() / totalLessons else 0f
     }
     Column(
         modifier = Modifier
@@ -434,59 +382,170 @@ fun ProgressSection(userProgress: UserProgress) {
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
             .padding(16.dp)
     ) {
-        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-        val totalCorrectAnswers = userProgress.sectionProgress.values.sum()
-        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
-        Text("Правильных ответов: $totalCorrectAnswers", style = MaterialTheme.typography.bodyMedium)
+        Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.height(8.dp))
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                progress = progress,
+                modifier = Modifier.size(100.dp),
+                strokeWidth = 8.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleLarge)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(text = "Пройдено ${userProgress.completedLessons.size} из $totalLessons уроков", style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+fun ProgressSection(userProgress: UserProgress) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .padding(16.dp)
+    ) {
+        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
+        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
+
+        if (userProgress.completedLessons.isNotEmpty()) {
+            Text("Пройденные уроки:", style = MaterialTheme.typography.titleMedium)
+            userProgress.completedLessons.forEach { lessonId ->
+                Text(text = "Урок $lessonId", style = MaterialTheme.typography.bodyMedium)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         if (userProgress.completedSections.isNotEmpty()) {
             Text("Пройденные разделы:", style = MaterialTheme.typography.titleMedium)
             userProgress.completedSections.forEach { sectionId ->
-                Text(text = "Раздел $sectionId")
+                Text(text = "Раздел $sectionId", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 }
-private fun loadUserProgress(onProgressLoaded: (UserProgress) -> Unit) {
-    val userId = Firebase.auth.currentUser?.uid ?: "testUser"
-    val db = Firebase.firestore
-    val userRef = db.collection("users").document(userId)
+//@Composable
+//fun StatisticsSection() {
+//    var userProgress by remember { mutableStateOf<UserProgress?>(null) }
+//    var progress by remember { mutableStateOf(0f) }
+//    var totalSections by remember { mutableStateOf(0) }
+//    val userId = Firebase.auth.currentUser?.uid
+//
+//    LaunchedEffect(userId) {
+//        if (userId != null) {
+//            loadUserProgress() { progress ->
+//                userProgress = progress
+//            }
+//            loadTotalSections() { total ->
+//                totalSections = total
+//            }
+//        }
+//    }
+//
+//    if (userProgress != null) {
+//        val completedSections = userProgress!!.completedSections.size
+//        val totalCorrectAnswers = userProgress!!.sectionProgress.values.sum()
+//        progress = if (totalSections > 0) completedSections.toFloat() / totalSections else 0f
+//
+//        Column(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+//                .padding(16.dp)
+//        ) {
+//            Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
+//            Spacer(modifier = Modifier.height(8.dp))
+//            Box(contentAlignment = Alignment.Center) {
+//                CircularProgressIndicator(
+//                    progress = progress,
+//                    modifier = Modifier.size(100.dp),
+//                    strokeWidth = 8.dp,
+//                    color = MaterialTheme.colorScheme.primary
+//                )
+//                Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleLarge)
+//            }
+//            Spacer(modifier = Modifier.height(8.dp))
+//            Text(text = "Пройдено $completedSections из $totalSections разделов", style = MaterialTheme.typography.bodyMedium)
+//        }
+//    }
+//}
+//@Composable
+//fun ProgressSection(userProgress: UserProgress) {
+//    Column(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+//            .padding(16.dp)
+//    ) {
+//        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
+//
+//        val totalCorrectAnswers = userProgress.sectionProgress.values.sum()
+//        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
+//        Text("Правильных ответов: $totalCorrectAnswers", style = MaterialTheme.typography.bodyMedium)
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        if (userProgress.completedLessons.isNotEmpty()) {
+//            Text("Пройденные уроки:", style = MaterialTheme.typography.titleMedium)
+//            userProgress.completedLessons.forEach { lessonId ->
+//                Text(text = "Урок $lessonId", style = MaterialTheme.typography.bodyMedium)
+//            }
+//            Spacer(modifier = Modifier.height(8.dp))
+//        }
+//
+//
+//        if (userProgress.completedSections.isNotEmpty()) {
+//            Text("Пройденные разделы:", style = MaterialTheme.typography.titleMedium)
+//            userProgress.completedSections.forEach { sectionId ->
+//                Text(text = "Раздел $sectionId", style = MaterialTheme.typography.bodyMedium)
+//            }
+//        }
+//    }
+//}
+//fun loadUserProgress(onProgressLoaded: (UserProgress) -> Unit) {
+//    val userId = Firebase.auth.currentUser?.uid ?: "testUser"
+//    val db = Firebase.firestore
+//    val userRef = db.collection("users").document(userId)
+//
+//    userRef.get()
+//        .addOnSuccessListener { document ->
+//            val userProgress = document.toObject(UserProgress::class.java) ?: UserProgress()
+//            onProgressLoaded(userProgress)
+//            Log.d("StatisticsSection", "User progress loaded successfully: $userProgress")
+//        }
+//        .addOnFailureListener { e ->
+//            Log.e("StatisticsSection", "Error loading user progress", e)
+//        }
+//}
 
-    userRef.get()
-        .addOnSuccessListener { document ->
-            val userProgress = document.toObject(UserProgress::class.java) ?: UserProgress()
-            onProgressLoaded(userProgress)
-            Log.d("StatisticsSection", "User progress loaded successfully: $userProgress")
-        }
-        .addOnFailureListener { e ->
-            Log.e("StatisticsSection", "Error loading user progress", e)
-        }
-}
-private fun loadLessonTitles(lessonIds: List<String>, onTitlesLoaded: (Map<String, String>) -> Unit) {
-    if (lessonIds.isEmpty()) {
-        onTitlesLoaded(emptyMap())
-        return
-    }
-    val db = Firebase.firestore
-    val lessonRef = db.collection("lessons")
-    val lessonTitles = mutableMapOf<String, String>()
 
-    lessonRef.whereIn(FieldPath.documentId(), lessonIds).get()
-        .addOnSuccessListener { querySnapshot ->
-            for (document in querySnapshot.documents){
-                val lessonId = document.id
-                val lessonTitle = document.getString("lessonTitle")
-                if (lessonTitle != null) {
-                    lessonTitles[lessonId] = lessonTitle
-                }
-            }
-            onTitlesLoaded(lessonTitles)
-            Log.d("ProgressSection", "Lessons titles loaded successfully: $lessonTitles")
 
-        }.addOnFailureListener { e ->
-            Log.e("ProgressSection", "Error loading lessons", e)
-        }
-}
+
+//private fun loadLessonTitles(lessonIds: List<String>, onTitlesLoaded: (Map<String, String>) -> Unit) {
+//    if (lessonIds.isEmpty()) {
+//        onTitlesLoaded(emptyMap())
+//        return
+//    }
+//    val db = Firebase.firestore
+//    val lessonRef = db.collection("lessons")
+//    val lessonTitles = mutableMapOf<String, String>()
+//
+//    lessonRef.whereIn(FieldPath.documentId(), lessonIds).get()
+//        .addOnSuccessListener { querySnapshot ->
+//            for (document in querySnapshot.documents){
+//                val lessonId = document.id
+//                val lessonTitle = document.getString("lessonTitle")
+//                if (lessonTitle != null) {
+//                    lessonTitles[lessonId] = lessonTitle
+//                }
+//            }
+//            onTitlesLoaded(lessonTitles)
+//            Log.d("ProgressSection", "Lessons titles loaded successfully: $lessonTitles")
+//
+//        }.addOnFailureListener { e ->
+//            Log.e("ProgressSection", "Error loading lessons", e)
+//        }
+//}
 
 private fun loadTotalSections(onTotalLoaded: (Int) -> Unit) {
     val db = Firebase.firestore
