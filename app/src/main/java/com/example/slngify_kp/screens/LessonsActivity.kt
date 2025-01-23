@@ -248,21 +248,19 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
             }
         }
     }
-
     private fun loadSections(document: com.google.firebase.firestore.DocumentSnapshot) {
         viewModelScope.launch {
             val lessonSections = mutableListOf<Pair<String, LessonSection>>()
             _error.value = null
             try {
-                val sectionA = document.get("sectionA") as? Map<*,*>
-                if(sectionA != null) {
+                val sectionA = document.get("sectionA") as? Map<*, *>
+                if (sectionA != null) {
                     val contentA = sectionA["content"] as? String
                     val imageUrlA = sectionA["imageUrl"] as? String
-                    lessonSections.add(Pair("sectionA", LessonSection(contentA,imageUrlA)))
+                    lessonSections.add(Pair("sectionA", LessonSection(contentA, imageUrlA)))
                     Log.d("LessonViewModel", "Секция sectionA: content = $contentA, image = $imageUrlA")
                 }
-                var sectionIndex = 'B'
-
+                var sectionIndex = 'B' // Начинаем с sectionB
                 while (true) {
                     val sectionKey = "section$sectionIndex"
                     val sectionData = document.get(sectionKey) as? Map<*, *>
@@ -273,7 +271,7 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
                     val imageUrl = sectionData["imageUrl"] as? String
                     lessonSections.add(Pair(sectionKey, LessonSection(content, imageUrl)))
                     Log.d("LessonViewModel", "Секция $sectionKey: content = $content, image = $imageUrl")
-                    sectionIndex++
+                    sectionIndex++ // Переходим к следующей секции
                 }
             } catch (e: Exception) {
                 _error.value = "Ошибка загрузки секции: ${e.message}"
@@ -511,3 +509,4 @@ fun LessonsScreenPreview() {
         LessonsScreen(rememberNavController())
     }
 }
+

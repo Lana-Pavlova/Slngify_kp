@@ -663,19 +663,19 @@ private fun updateUserData(
 }
 
 private fun isEmailUnique(email: String, onResult: (Boolean) -> Unit) {
-        val db = Firebase.firestore
-        db.collection("users")
-            .whereEqualTo("email", email)
-            .get()
-            .addOnCompleteListener { task ->
-                if(task.isSuccessful){
-                    val querySnapshot = task.result
-                    onResult(querySnapshot.isEmpty)
-                } else {
-                    onResult(false)
-                }
+    val db = Firebase.firestore
+    db.collection("users")
+        .whereEqualTo("email", email)
+        .get()
+        .addOnCompleteListener { task ->
+            if(task.isSuccessful){
+                val querySnapshot = task.result
+                onResult(querySnapshot.isEmpty)
+            } else {
+                onResult(false)
             }
-    }
+        }
+}
 
 @Preview(showBackground = true)
 @Composable
@@ -685,4 +685,3 @@ fun ProfilePagePreview() {
         ProfilePage(navController)
     }
 }
-
