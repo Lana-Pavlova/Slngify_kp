@@ -77,14 +77,12 @@ data class LessonSection(
     val content: String?,
     val imageUrl: String?
 )
-
 data class Lesson(
     val lessonTitle: String,
     val practiceSectionId: String,
     val previousLessonId: String?,
     val id: String
 )
-
 data class LessonListItem(
     val id: String,
     val lessonTitle: String,
@@ -237,7 +235,7 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
                     lessonTitle = lessonTitle,
                     practiceSectionId = practiceSectionId,
                     previousLessonId = previousLessonId,
-                    id = lessonId,
+                    id = lessonId
                 )
                 loadSections(document)
             } catch (e: Exception) {
@@ -312,7 +310,7 @@ fun LessonsScreen(navController: NavHostController) {
         }
     ) { paddingValues ->
         if (loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Loading...")
             }
         } else {
@@ -484,11 +482,6 @@ fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostControl
                     text = lessonItem.lessonTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontSize = 18.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${lessonItem.sectionCount} секций",
-                    style = MaterialTheme.typography.bodyMedium
                 )
             }
             if (!isUnlocked) {

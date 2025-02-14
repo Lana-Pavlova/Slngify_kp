@@ -181,6 +181,7 @@ fun ProfilePage(navController: NavController) {
         }
     )
 }
+
 @Composable
 fun ProfileHeader(name : String, email : String) {
     Column(
@@ -203,6 +204,7 @@ fun ProfileHeader(name : String, email : String) {
         Text(text = email, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
 @Composable
 fun AuthorInfo(
     initialName: String,
@@ -314,6 +316,7 @@ fun AuthForm(onRegisterClick: () -> Unit) {
 
     }
 }
+
 @Composable
 fun RegistrationForm(onRegisterComplete: () -> Unit){
     var email by remember { mutableStateOf("") }
@@ -370,6 +373,7 @@ fun RegistrationForm(onRegisterComplete: () -> Unit){
 
     }
 }
+
 @Composable
 fun StatisticsSection(userProgress: UserProgress, totalLessons: Int) {
     var progress by remember { mutableStateOf(0f) }
@@ -425,140 +429,7 @@ fun ProgressSection(userProgress: UserProgress) {
         }
     }
 }
-//@Composable
-//fun StatisticsSection() {
-//    var userProgress by remember { mutableStateOf<UserProgress?>(null) }
-//    var progress by remember { mutableStateOf(0f) }
-//    var totalSections by remember { mutableStateOf(0) }
-//    val userId = Firebase.auth.currentUser?.uid
-//
-//    LaunchedEffect(userId) {
-//        if (userId != null) {
-//            loadUserProgress() { progress ->
-//                userProgress = progress
-//            }
-//            loadTotalSections() { total ->
-//                totalSections = total
-//            }
-//        }
-//    }
-//
-//    if (userProgress != null) {
-//        val completedSections = userProgress!!.completedSections.size
-//        val totalCorrectAnswers = userProgress!!.sectionProgress.values.sum()
-//        progress = if (totalSections > 0) completedSections.toFloat() / totalSections else 0f
-//
-//        Column(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-//                .padding(16.dp)
-//        ) {
-//            Text(text = "Ваш прогресс", style = MaterialTheme.typography.headlineSmall)
-//            Spacer(modifier = Modifier.height(8.dp))
-//            Box(contentAlignment = Alignment.Center) {
-//                CircularProgressIndicator(
-//                    progress = progress,
-//                    modifier = Modifier.size(100.dp),
-//                    strokeWidth = 8.dp,
-//                    color = MaterialTheme.colorScheme.primary
-//                )
-//                Text(text = "${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleLarge)
-//            }
-//            Spacer(modifier = Modifier.height(8.dp))
-//            Text(text = "Пройдено $completedSections из $totalSections разделов", style = MaterialTheme.typography.bodyMedium)
-//        }
-//    }
-//}
-//@Composable
-//fun ProgressSection(userProgress: UserProgress) {
-//    Column(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-//            .padding(16.dp)
-//    ) {
-//        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-//
-//        val totalCorrectAnswers = userProgress.sectionProgress.values.sum()
-//        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
-//        Text("Правильных ответов: $totalCorrectAnswers", style = MaterialTheme.typography.bodyMedium)
-//        Spacer(modifier = Modifier.height(8.dp))
-//
-//        if (userProgress.completedLessons.isNotEmpty()) {
-//            Text("Пройденные уроки:", style = MaterialTheme.typography.titleMedium)
-//            userProgress.completedLessons.forEach { lessonId ->
-//                Text(text = "Урок $lessonId", style = MaterialTheme.typography.bodyMedium)
-//            }
-//            Spacer(modifier = Modifier.height(8.dp))
-//        }
-//
-//
-//        if (userProgress.completedSections.isNotEmpty()) {
-//            Text("Пройденные разделы:", style = MaterialTheme.typography.titleMedium)
-//            userProgress.completedSections.forEach { sectionId ->
-//                Text(text = "Раздел $sectionId", style = MaterialTheme.typography.bodyMedium)
-//            }
-//        }
-//    }
-//}
-//fun loadUserProgress(onProgressLoaded: (UserProgress) -> Unit) {
-//    val userId = Firebase.auth.currentUser?.uid ?: "testUser"
-//    val db = Firebase.firestore
-//    val userRef = db.collection("users").document(userId)
-//
-//    userRef.get()
-//        .addOnSuccessListener { document ->
-//            val userProgress = document.toObject(UserProgress::class.java) ?: UserProgress()
-//            onProgressLoaded(userProgress)
-//            Log.d("StatisticsSection", "User progress loaded successfully: $userProgress")
-//        }
-//        .addOnFailureListener { e ->
-//            Log.e("StatisticsSection", "Error loading user progress", e)
-//        }
-//}
 
-
-
-
-//private fun loadLessonTitles(lessonIds: List<String>, onTitlesLoaded: (Map<String, String>) -> Unit) {
-//    if (lessonIds.isEmpty()) {
-//        onTitlesLoaded(emptyMap())
-//        return
-//    }
-//    val db = Firebase.firestore
-//    val lessonRef = db.collection("lessons")
-//    val lessonTitles = mutableMapOf<String, String>()
-//
-//    lessonRef.whereIn(FieldPath.documentId(), lessonIds).get()
-//        .addOnSuccessListener { querySnapshot ->
-//            for (document in querySnapshot.documents){
-//                val lessonId = document.id
-//                val lessonTitle = document.getString("lessonTitle")
-//                if (lessonTitle != null) {
-//                    lessonTitles[lessonId] = lessonTitle
-//                }
-//            }
-//            onTitlesLoaded(lessonTitles)
-//            Log.d("ProgressSection", "Lessons titles loaded successfully: $lessonTitles")
-//
-//        }.addOnFailureListener { e ->
-//            Log.e("ProgressSection", "Error loading lessons", e)
-//        }
-//}
-
-private fun loadTotalSections(onTotalLoaded: (Int) -> Unit) {
-    val db = Firebase.firestore
-    db.collection("sections")
-        .get()
-        .addOnSuccessListener { querySnapshot ->
-            onTotalLoaded(querySnapshot.size())
-            Log.d("StatisticsSection", "Total sections loaded successfully: ${querySnapshot.size()}")
-        }
-        .addOnFailureListener { e ->
-            Log.e("StatisticsSection", "Error loading total sections", e)
-        }
-}
 private fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
     val auth = Firebase.auth
     val db = Firebase.firestore
@@ -600,6 +471,7 @@ private fun loginUser(email: String, password: String, onComplete: (Boolean, Str
             }
         }
 }
+
 private fun signOutUser(navController: NavController){
     val auth = Firebase.auth
     auth.signOut()
