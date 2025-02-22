@@ -49,7 +49,6 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 import androidx.compose.material3.CircularProgressIndicator
 import com.example.slngify_kp.widget.WordOfTheDayWidget
-import com.google.firebase.firestore.AggregateSource
 
 data class WordOfTheDay(
     val definition : String? = null,
@@ -79,7 +78,7 @@ fun NavigationComponent() {
         composable("lessonsList") { LessonsScreen(navController) }
         composable("sectionsList") { SectionsScreen(navController) }
         composable("dictionaryPage") { DictionaryScreen(navController) }
-        composable("profilePage") { ProfilePage(navController) }
+        composable("profilePage") { ProfilePage(navController = navController) }
         composable("lessonDetail/{lessonDocumentId}") { backStackEntry ->
             val lessonDocumentId = backStackEntry.arguments?.getString("lessonDocumentId") ?: ""
             LessonScreen(lessonDocumentId = lessonDocumentId, navController = navController)

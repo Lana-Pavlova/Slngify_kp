@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.slngify_kp" />
+                  <option name="mobileSdkAppId" value="1:515116768848:android:958c3d84f9c6aeaeaabb55" />
+                  <option name="projectId" value="slangify-fd9e6" />
+                  <option name="projectNumber" value="515116768848" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
