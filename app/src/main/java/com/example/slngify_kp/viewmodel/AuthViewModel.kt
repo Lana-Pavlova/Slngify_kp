@@ -17,7 +17,6 @@ class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = Firebase.auth
     private val db: FirebaseFirestore = Firebase.firestore
 
-    // Состояния UI (как и раньше)
     val registrationLoading = MutableLiveData<Boolean>()
     val registrationError = MutableLiveData<String?>()
     val registrationSuccess = MutableLiveData<Boolean>()

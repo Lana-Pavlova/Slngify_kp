@@ -63,12 +63,16 @@ import coil.request.ImageRequest
 import coil.size.Size
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
+import com.example.slngify_kp.viewmodel.AchievementData
+import com.example.slngify_kp.viewmodel.UserProgress
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -77,12 +81,14 @@ data class LessonSection(
     val content: String?,
     val imageUrl: String?
 )
+
 data class Lesson(
     val lessonTitle: String,
     val practiceSectionId: String,
     val previousLessonId: String?,
     val id: String
 )
+
 data class LessonListItem(
     val id: String,
     val lessonTitle: String,
@@ -90,9 +96,11 @@ data class LessonListItem(
     val previousLessonId: String? = null,
     val isCompleted: Boolean = false
 )
+
 enum class LessonFilter {
     ALL, COMPLETED, NOT_COMPLETED
 }
+
 
 class LessonsViewModel : ViewModel() {
     private val firestore = Firebase.firestore
@@ -111,44 +119,87 @@ class LessonsViewModel : ViewModel() {
     val currentFilter: StateFlow<LessonFilter> = _currentFilter
 
     init {
-        loadLessons()
-        auth.currentUser?.uid?.let { loadUserProgress(it) }
+        loadData()
     }
 
-    private fun loadLessons() {
+    private fun loadData() {
         viewModelScope.launch {
-            _loading.value = true
-            try {
-                val documents = firestore.collection("lessons").get().await()
-                val lessons = mutableListOf<LessonListItem>()
-                for (document in documents) {
-                    val sectionA = document.get("sectionA") as? Map<*, *>
-                    val lessonTitle = sectionA?.get("content") as? String ?: "No title"
-                    val sectionIds = document.get("sectionIds") as? List<String> ?: emptyList()
-                    val sectionCount = sectionIds.size
-                    val previousLessonId = document.getString("previousLessonId")
-                    val lessonId = document.getString("lessonId") ?: ""
-                    val isCompleted = _userProgress.value.completedLessons.contains(lessonId)
+            val userId = auth.currentUser?.uid ?: return@launch
 
-                    lessons.add(
-                        LessonListItem(
-                            id = lessonId,
-                            lessonTitle = lessonTitle,
-                            sectionCount = sectionCount,
-                            previousLessonId = previousLessonId,
-                            isCompleted = isCompleted
-                        )
-                    )
-                }
-                _lessonList.value = filterLessons(lessons)
-            } catch (e: Exception) {
-                Log.e("LessonsViewModel", "Error getting lessons", e)
-            } finally {
+            combine(
+                loadUserProgressFlow(userId),
+                loadLessonsFlow()
+            ) { userProgress, lessons ->
+                _userProgress.value = userProgress
+                _lessonList.value = filterLessons(lessons, userProgress.completedLessons)
+            }.collect {
                 _loading.value = false
             }
         }
     }
 
+
+    private fun loadLessonsFlow(): kotlinx.coroutines.flow.Flow<List<LessonListItem>> = kotlinx.coroutines.flow.flow {
+        _loading.value = true
+        try {
+            val documents = firestore.collection("lessons").get().await()
+            val lessons = mutableListOf<LessonListItem>()
+            for (document in documents) {
+                val sectionA = document.get("sectionA") as? Map<*, *>
+                val lessonTitle = sectionA?.get("content") as? String ?: "No title"
+                val sectionIds = document.get("sectionIds") as? List<String> ?: emptyList()
+                val sectionCount = sectionIds.size
+                val previousLessonId = document.getString("previousLessonId")
+                val lessonId = document.id
+                lessons.add(
+                    LessonListItem(
+                        id = lessonId,
+                        lessonTitle = lessonTitle,
+                        sectionCount = sectionCount,
+                        previousLessonId = previousLessonId,
+                        isCompleted = false
+                    )
+                )
+            }
+            emit(lessons)
+        } catch (e: Exception) {
+            Log.e("LessonsViewModel", "Error getting lessons", e)
+            emit(emptyList())
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    private fun loadUserProgressFlow(userId: String): kotlinx.coroutines.flow.Flow<UserProgress> = kotlinx.coroutines.flow.flow {
+        try {
+            val userDocument = firestore.collection("users").document(userId).get().await()
+            val completedLessons = userDocument.get("completedLessonIds") as? List<String> ?: emptyList()
+            val completedTasks = userDocument.get("completedTaskIds") as? List<String> ?: emptyList()
+            val achievementIds = userDocument.get("achievementIds") as? List<String> ?: emptyList()
+
+            // Загружаем информацию о каждом достижении по его ID
+            val achievements = mutableListOf<AchievementData>()
+            for (achievementId in achievementIds) {
+                val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
+                if (achievementDocument.exists()) {
+                    val name = achievementDocument.getString("name") ?: ""
+                    val icon = achievementDocument.getString("icon") ?: ""
+                    achievements.add(AchievementData(name, icon))
+                }
+            }
+            emit(UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements))
+        } catch (e: Exception) {
+            Log.e("LessonsViewModel", "Error getting user progress", e)
+            emit(UserProgress())
+        }
+    }
+
+
+    private fun filterLessons(lessons: List<LessonListItem>, completedLessons: List<String>): List<LessonListItem> {
+        return lessons.map { lesson ->
+            lesson.copy(isCompleted = completedLessons.contains(lesson.id))
+        }
+    }
     private fun filterLessons(lessons: List<LessonListItem>): List<LessonListItem> {
         return when (_currentFilter.value) {
             LessonFilter.ALL -> lessons
@@ -157,40 +208,35 @@ class LessonsViewModel : ViewModel() {
         }
     }
 
-    private fun loadUserProgress(userId: String) {
-        viewModelScope.launch {
-            try {
-                val userDocument = firestore.collection("users").document(userId).get().await()
-                val completedIds = userDocument.get("completedLessonIds") as? List<String> ?: emptyList()
-                val completedSections = userDocument.get("completedSections") as? List<String> ?: emptyList()
-                _userProgress.value = UserProgress(completedLessons = completedIds, completedSections = completedSections)
-                loadLessons()
-                Log.d("LessonsViewModel", "user progress loaded completed sections: $completedSections")
-            } catch (e: Exception) {
-                Log.e("LessonsViewModel", "Error load user progress", e)
-            }
-        }
-    }
-
     fun setFilter(filter: LessonFilter) {
         _currentFilter.value = filter
-        loadLessons()
+        loadData()
     }
 
     fun markLessonCompleted(lessonId: String) {
         viewModelScope.launch {
             val userId = auth.currentUser?.uid ?: return@launch
-            val currentCompleted = _userProgress.value.completedLessons.toMutableList()
-
-            if (!currentCompleted.contains(lessonId)) {
-                currentCompleted.add(lessonId)
-            }
 
             try {
+                // 1. Обновляем Firestore
                 firestore.collection("users").document(userId)
-                    .update("completedLessonIds", currentCompleted.toList()).await()
-                _userProgress.value = UserProgress(completedLessons = currentCompleted)
-                loadLessons()
+                    .update("completedLessonIds", FieldValue.arrayUnion(lessonId))
+                    .await()
+
+                // 2. Обновляем _userProgress.value
+                _userProgress.value = _userProgress.value.copy(
+                    completedLessons = _userProgress.value.completedLessons + lessonId
+                )
+
+                // 3. Обновляем lessonList
+                _lessonList.value = _lessonList.value.map { lesson ->
+                    if (lesson.id == lessonId) {
+                        lesson.copy(isCompleted = true)
+                    } else {
+                        lesson
+                    }
+                }
+
             } catch (e: Exception) {
                 Log.e("LessonsViewModel", "Error mark lesson completed", e)
             }
@@ -212,7 +258,6 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-
     init {
         loadLesson()
     }
@@ -224,11 +269,10 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
             try {
                 Log.d("LessonViewModel", "Загрузка урока с ID: $lessonDocumentId")
                 val document = firestore.collection("lessons").document(lessonDocumentId).get().await()
-                val sectionA = document.get("sectionA") as? Map<*, *>
-                val lessonTitle = sectionA?.get("content") as? String ?: "Урок"
+                val lessonTitle = document.getString("lessonTitle") ?: "Урок"
                 val practiceSectionId = document.getString("practiceSectionId") ?: ""
                 val previousLessonId = document.getString("previousLessonId")
-                val lessonId = document.getString("lessonId") ?: ""
+                val lessonId = document.id
                 Log.d("LessonViewModel", "Данные урока: $lessonTitle")
 
                 _lesson.value = Lesson(
@@ -246,30 +290,25 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
             }
         }
     }
+
     private fun loadSections(document: com.google.firebase.firestore.DocumentSnapshot) {
         viewModelScope.launch {
             val lessonSections = mutableListOf<Pair<String, LessonSection>>()
             _error.value = null
             try {
-                val sectionA = document.get("sectionA") as? Map<*, *>
-                if (sectionA != null) {
-                    val contentA = sectionA["content"] as? String
-                    val imageUrlA = sectionA["imageUrl"] as? String
-                    lessonSections.add(Pair("sectionA", LessonSection(contentA, imageUrlA)))
-                    Log.d("LessonViewModel", "Секция sectionA: content = $contentA, image = $imageUrlA")
-                }
-                var sectionIndex = 'B' // Начинаем с sectionB
-                while (true) {
-                    val sectionKey = "section$sectionIndex"
-                    val sectionData = document.get(sectionKey) as? Map<*, *>
-                    if (sectionData == null) {
-                        break // Если sectionKey не найден, заканчиваем цикл
+                val data = document.data
+                if (data != null) {
+                    for ((key, value) in data) {
+                        if (key.startsWith("section")) {
+                            val sectionData = value as? Map<*, *>
+                            if (sectionData != null) {
+                                val content = sectionData["content"] as? String
+                                val imageUrl = sectionData["imageUrl"] as? String
+                                lessonSections.add(Pair(key, LessonSection(content, imageUrl)))
+                                Log.d("LessonViewModel", "Секция $key: content = $content, image = $imageUrl")
+                            }
+                        }
                     }
-                    val content = sectionData["content"] as? String
-                    val imageUrl = sectionData["imageUrl"] as? String
-                    lessonSections.add(Pair(sectionKey, LessonSection(content, imageUrl)))
-                    Log.d("LessonViewModel", "Секция $sectionKey: content = $content, image = $imageUrl")
-                    sectionIndex++ // Переходим к следующей секции
                 }
             } catch (e: Exception) {
                 _error.value = "Ошибка загрузки секции: ${e.message}"

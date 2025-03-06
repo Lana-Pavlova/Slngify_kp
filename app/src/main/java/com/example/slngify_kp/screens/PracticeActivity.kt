@@ -67,6 +67,7 @@ import coil.request.ImageRequest
 import coil.size.Size
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
+import com.example.slngify_kp.viewmodel.ProgressViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
@@ -474,8 +475,7 @@ fun ResultScreen(
 ) {
     val progress = if (numberOfQuestions > 0) numberOfCorrectAnswers.toFloat() / numberOfQuestions else 0f
     val sectionsViewModel : SectionsViewModel = viewModel()
-    val lessonViewModel: LessonViewModel = viewModel { lessonId?.let { LessonViewModel(it) } ?: LessonViewModel("") }
-    val lessonsViewModel: LessonsViewModel = viewModel()
+    val viewModel: ProgressViewModel = viewModel()
 
     Column(
         modifier = modifier
@@ -528,15 +528,16 @@ fun ResultScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = {
+            // 1. Отмечаем секцию как пройденную
+            sectionsViewModel.markSectionCompleted(sectionId) // Лучше использовать MainViewModel
+
+            // 2. Выдаем достижение
+            viewModel.awardAchievement(sectionId)
+
+            // 3. Возвращаемся к списку разделов
             navController.popBackStack()
         }) {
             Text("Вернуться к списку разделов")
-        }
-        LaunchedEffect(Unit) {
-            lessonId?.let {
-                lessonsViewModel.markLessonCompleted(it)
-            }
-            sectionsViewModel.markSectionCompleted(sectionId)
         }
     }
 }
