@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+
+// добавить статистику выполнения заданий (где были ошибки и тд)
 data class UserProgress(
     val completedLessons: List<String> = emptyList(),
     val completedTasks: List<String> = emptyList(),

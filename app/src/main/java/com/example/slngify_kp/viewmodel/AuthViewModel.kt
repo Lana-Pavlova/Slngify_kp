@@ -12,6 +12,10 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.UserProfileChangeRequest
 
 
+
+// добавить автоматическое обновление страницы
+
+
 class AuthViewModel : ViewModel() {
 
     private val auth: FirebaseAuth = Firebase.auth
@@ -88,6 +92,7 @@ class AuthViewModel : ViewModel() {
     }
 
     // Функция выхода
+    // доделать на выход из аккаунта и оставаться на странице профиля (пустой)
     fun signOutUser(navController: NavController) {
         auth.signOut()
         navController.navigate("home") {
@@ -219,7 +224,7 @@ class AuthViewModel : ViewModel() {
         val userDocRef = db.collection("users").document(userId)
         userDocRef.update(mapOf(
             "email" to email,
-            "name" to name // Добавили name
+            "name" to name
         )).addOnCompleteListener { firestoreTask ->
             if (firestoreTask.isSuccessful) {
                 onComplete(true, null)
