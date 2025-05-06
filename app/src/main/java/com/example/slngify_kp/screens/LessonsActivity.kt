@@ -1,6 +1,8 @@
 package com.example.slngify_kp.screens
 
 import android.util.Log
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -42,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -496,44 +501,102 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
     }
 }
 
+//@Composable
+//fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress) {
+//    val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessons.contains(lessonItem.previousLessonId)
+//
+//    Card(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(8.dp),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+//        enabled = isUnlocked,
+//        onClick = {
+//            if (isUnlocked) {
+//                navController.navigate("lessonDetail/${lessonItem.id}")
+//            }
+//        }
+//    ) {
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.SpaceBetween
+//        ) {
+//            Column(modifier = Modifier.padding(16.dp)) {
+//                Text(
+//                    text = lessonItem.lessonTitle,
+//                    style = MaterialTheme.typography.titleMedium,
+//                    fontSize = 18.sp
+//                )
+//            }
+//            if (!isUnlocked) {
+//                Icon(
+//                    imageVector = Icons.Filled.Lock,
+//                    contentDescription = "Заблокировано",
+//                    modifier = Modifier
+//                        .padding(16.dp)
+//                )
+//            }
+//        }
+//    }
+//}
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress) {
     val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessons.contains(lessonItem.previousLessonId)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        enabled = isUnlocked,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isUnlocked) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isUnlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
         onClick = {
             if (isUnlocked) {
                 navController.navigate("lessonDetail/${lessonItem.id}")
+            } else {
+                // Optional: Show a message that the lesson is locked
+                scope.launch {
+                    Toast.makeText(context, "Этот урок пока недоступен", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
+        },
+        border = if (!isUnlocked) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column {
                 Text(
                     text = lessonItem.lessonTitle,
                     style = MaterialTheme.typography.titleMedium,
-                    fontSize = 18.sp
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            if (!isUnlocked) {
+            if (!isUnlocked) {  // Отображаем иконку замка, если урок *не* разблокирован
                 Icon(
                     imageVector = Icons.Filled.Lock,
                     contentDescription = "Заблокировано",
-                    modifier = Modifier
-                        .padding(16.dp)
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 }
+
 @Preview(showBackground = true)
 @Composable
 fun LessonsScreenPreview() {

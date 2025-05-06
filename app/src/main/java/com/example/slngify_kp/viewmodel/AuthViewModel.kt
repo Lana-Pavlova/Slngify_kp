@@ -18,8 +18,8 @@ import com.google.firebase.auth.UserProfileChangeRequest
 
 class AuthViewModel : ViewModel() {
 
-    private val auth: FirebaseAuth = Firebase.auth
-    private val db: FirebaseFirestore = Firebase.firestore
+    var auth: FirebaseAuth = Firebase.auth
+    var db: FirebaseFirestore = Firebase.firestore
 
     val registrationLoading = MutableLiveData<Boolean>()
     val registrationError = MutableLiveData<String?>()
