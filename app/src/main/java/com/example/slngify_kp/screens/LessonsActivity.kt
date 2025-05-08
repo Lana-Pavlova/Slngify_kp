@@ -3,7 +3,6 @@ package com.example.slngify_kp.screens
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,22 +20,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -52,9 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,20 +64,21 @@ import com.example.slngify_kp.ui.theme.MyTheme
 import com.example.slngify_kp.viewmodel.AchievementData
 import com.example.slngify_kp.viewmodel.UserProgress
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // Модели данных
 data class LessonSection(
-    val content: String?,
-    val imageUrl: String?
+    val title: String? = null,
+    val content: String? = null,
+    val imageUrl: String? = null,
+    val order: Int? = null
 )
 
 data class Lesson(
@@ -112,77 +106,58 @@ class LessonsViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
 
     private val _lessonList = MutableStateFlow<List<LessonListItem>>(emptyList())
-    val lessonList: StateFlow<List<LessonListItem>> = _lessonList
+    val lessonList: StateFlow<List<LessonListItem>> = _lessonList.asStateFlow()
 
     private val _loading = MutableStateFlow(true)
-    val loading: StateFlow<Boolean> = _loading
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
     private val _userProgress = MutableStateFlow(UserProgress())
-    val userProgress: StateFlow<UserProgress> = _userProgress
+    val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
 
     private val _currentFilter = MutableStateFlow(LessonFilter.ALL)
-    val currentFilter: StateFlow<LessonFilter> = _currentFilter
+    val currentFilter: StateFlow<LessonFilter> = _currentFilter.asStateFlow()
 
     init {
         loadData()
     }
 
     private fun loadData() {
+        Log.d("LessonsViewModel", "loadData called")
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
+            val userId = auth.currentUser?.uid
+            Log.d("LessonsViewModel", "UserId: $userId")
+            if (userId == null) {
+                Log.e("LessonsViewModel", "UserId is null, returning")
+                return@launch
+            }
 
-            combine(
-                loadUserProgressFlow(userId),
-                loadLessonsFlow()
-            ) { userProgress, lessons ->
+            _loading.value = true
+
+            try {
+                val userProgress = loadUserProgress(userId)
                 _userProgress.value = userProgress
-                _lessonList.value = filterLessons(lessons, userProgress.completedLessons)
-            }.collect {
-                _loading.value = false
+
+                loadLessonsFlow(completedLessons = userProgress.completedLessons)
+                    .collect { lessons ->
+                        _lessonList.value = filterLessons(lessons, userProgress.completedLessons) // Вызываем filterLessons
+                    }
+            } catch (e: Exception) {
+                Log.e("LessonsViewModel", "Error loading data", e)
+            } finally {
+                _loading.value = false // Set loading to false
+                Log.d("LessonsViewModel", "loadData finished")
             }
         }
     }
 
-
-    private fun loadLessonsFlow(): kotlinx.coroutines.flow.Flow<List<LessonListItem>> = kotlinx.coroutines.flow.flow {
-        _loading.value = true
-        try {
-            val documents = firestore.collection("lessons").get().await()
-            val lessons = mutableListOf<LessonListItem>()
-            for (document in documents) {
-                val sectionA = document.get("sectionA") as? Map<*, *>
-                val lessonTitle = sectionA?.get("content") as? String ?: "No title"
-                val sectionIds = document.get("sectionIds") as? List<String> ?: emptyList()
-                val sectionCount = sectionIds.size
-                val previousLessonId = document.getString("previousLessonId")
-                val lessonId = document.id
-                lessons.add(
-                    LessonListItem(
-                        id = lessonId,
-                        lessonTitle = lessonTitle,
-                        sectionCount = sectionCount,
-                        previousLessonId = previousLessonId,
-                        isCompleted = false
-                    )
-                )
-            }
-            emit(lessons)
-        } catch (e: Exception) {
-            Log.e("LessonsViewModel", "Error getting lessons", e)
-            emit(emptyList())
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    private fun loadUserProgressFlow(userId: String): kotlinx.coroutines.flow.Flow<UserProgress> = kotlinx.coroutines.flow.flow {
-        try {
+    private suspend fun loadUserProgress(userId: String): UserProgress {
+        Log.d("LessonsViewModel", "loadUserProgress called")
+        return try {
             val userDocument = firestore.collection("users").document(userId).get().await()
             val completedLessons = userDocument.get("completedLessonIds") as? List<String> ?: emptyList()
             val completedTasks = userDocument.get("completedTaskIds") as? List<String> ?: emptyList()
             val achievementIds = userDocument.get("achievementIds") as? List<String> ?: emptyList()
 
-            // Загружаем информацию о каждом достижении по его ID
             val achievements = mutableListOf<AchievementData>()
             for (achievementId in achievementIds) {
                 val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
@@ -192,24 +167,63 @@ class LessonsViewModel : ViewModel() {
                     achievements.add(AchievementData(name, icon))
                 }
             }
-            emit(UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements))
+            Log.d("LessonsViewModel", "loadUserProgress finished") // Added log
+            UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements)
         } catch (e: Exception) {
             Log.e("LessonsViewModel", "Error getting user progress", e)
-            emit(UserProgress())
+            UserProgress()
         }
     }
 
+    private fun loadLessonsFlow(completedLessons: List<String>): kotlinx.coroutines.flow.Flow<List<LessonListItem>> = flow {
+        Log.d("LessonsViewModel", "loadLessonsFlow called") // Added log
+        _loading.value = true
+        try {
+            val documents = firestore.collection("lessons").get().await()
+            Log.d("LessonsViewModel", "Number of lessons found: ${documents.size()}") // Added log
+            val lessons = mutableListOf<LessonListItem>()
+
+            for (document in documents) {
+                val lessonId = document.id
+                val lessonData = document.data ?: emptyMap<String, Any>()
+
+                var lessonTitle = "No title"
+                if (lessonData.containsKey("sectionA") && lessonData["sectionA"] is Map<*, *>) {
+                    lessonTitle = (lessonData["sectionA"] as Map<*, *>).get("title") as? String ?: "No title"
+                }
+
+                val sectionCount = lessonData.count { it.key.startsWith("section") } // Count sections
+                val previousLessonId = document.getString("previousLessonId")
+
+                val isCompleted = completedLessons.contains(lessonId)
+
+                lessons.add(
+                    LessonListItem(
+                        id = lessonId,
+                        lessonTitle = lessonTitle,
+                        sectionCount = sectionCount,
+                        previousLessonId = previousLessonId,
+                        isCompleted = isCompleted
+                    )
+                )
+                Log.d("LessonsViewModel", "Lesson added: $lessonId, title: $lessonTitle")
+            }
+            emit(lessons)
+            Log.d("LessonsViewModel", "Lessons emitted: ${lessons.size}")
+        } catch (e: Exception) {
+            Log.e("LessonsViewModel", "Error getting lessons", e)
+            emit(emptyList())
+        } finally {
+            _loading.value = false
+            Log.d("LessonsViewModel", "loadLessonsFlow finished")
+        }
+    }
 
     private fun filterLessons(lessons: List<LessonListItem>, completedLessons: List<String>): List<LessonListItem> {
-        return lessons.map { lesson ->
-            lesson.copy(isCompleted = completedLessons.contains(lesson.id))
-        }
-    }
-    private fun filterLessons(lessons: List<LessonListItem>): List<LessonListItem> {
         return when (_currentFilter.value) {
             LessonFilter.ALL -> lessons
-            LessonFilter.COMPLETED -> lessons.filter { it.isCompleted }
-            LessonFilter.NOT_COMPLETED -> lessons.filter { !it.isCompleted }
+            LessonFilter.COMPLETED -> lessons.filter { completedLessons.contains(it.id) }
+            LessonFilter.NOT_COMPLETED -> lessons.filter { !completedLessons.contains(it.id) }
         }
     }
 
@@ -217,37 +231,8 @@ class LessonsViewModel : ViewModel() {
         _currentFilter.value = filter
         loadData()
     }
-
-    fun markLessonCompleted(lessonId: String) {
-        viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
-
-            try {
-                // 1. Обновляем Firestore
-                firestore.collection("users").document(userId)
-                    .update("completedLessonIds", FieldValue.arrayUnion(lessonId))
-                    .await()
-
-                // 2. Обновляем _userProgress.value
-                _userProgress.value = _userProgress.value.copy(
-                    completedLessons = _userProgress.value.completedLessons + lessonId
-                )
-
-                // 3. Обновляем lessonList
-                _lessonList.value = _lessonList.value.map { lesson ->
-                    if (lesson.id == lessonId) {
-                        lesson.copy(isCompleted = true)
-                    } else {
-                        lesson
-                    }
-                }
-
-            } catch (e: Exception) {
-                Log.e("LessonsViewModel", "Error mark lesson completed", e)
-            }
-        }
-    }
 }
+
 class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
 
     private val firestore = Firebase.firestore
@@ -274,7 +259,7 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
             try {
                 Log.d("LessonViewModel", "Загрузка урока с ID: $lessonDocumentId")
                 val document = firestore.collection("lessons").document(lessonDocumentId).get().await()
-                val lessonTitle = document.getString("lessonTitle") ?: "Урок"
+                val lessonTitle = document.getString("title") ?: "Урок"
                 val practiceSectionId = document.getString("practiceSectionId") ?: ""
                 val previousLessonId = document.getString("previousLessonId")
                 val lessonId = document.id
@@ -309,12 +294,15 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
                             if (sectionData != null) {
                                 val content = sectionData["content"] as? String
                                 val imageUrl = sectionData["imageUrl"] as? String
-                                lessonSections.add(Pair(key, LessonSection(content, imageUrl)))
+                                val title = sectionData["title"] as? String
+                                val order = (sectionData["order"] as? Number)?.toInt()
+                                lessonSections.add(Pair(key, LessonSection(title = title, content = content, imageUrl = imageUrl, order = order)))
                                 Log.d("LessonViewModel", "Секция $key: content = $content, image = $imageUrl")
                             }
                         }
                     }
                 }
+                lessonSections.sortBy { it.second.order }
             } catch (e: Exception) {
                 _error.value = "Ошибка загрузки секции: ${e.message}"
                 Log.e("LessonViewModel", "Error getting section", e)
@@ -333,6 +321,9 @@ fun LessonsScreen(navController: NavHostController) {
     val loading by viewModel.loading.collectAsState()
     val userProgress by viewModel.userProgress.collectAsState()
     val currentFilter by viewModel.currentFilter.collectAsState()
+
+    Log.d("LessonsScreen", "LessonsScreen called")
+    Log.d("LessonsScreen", "Loading: $loading, LessonList size: ${lessonList.size}")
 
     Scaffold(
         topBar = {
@@ -354,19 +345,34 @@ fun LessonsScreen(navController: NavHostController) {
         }
     ) { paddingValues ->
         if (loading) {
+            Log.d("LessonsScreen", "Loading indicator displayed")
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Loading...")
             }
         } else {
+            Log.d("LessonsScreen", "Not loading, LessonList size: ${lessonList.size}")
             Column(modifier = Modifier.padding(paddingValues)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     FilterButton(text = "Все", currentFilter = currentFilter, onClick = { viewModel.setFilter(LessonFilter.ALL) })
                     FilterButton(text = "Пройденные", currentFilter = currentFilter, onClick = { viewModel.setFilter(LessonFilter.COMPLETED) })
                     FilterButton(text = "Не пройденные", currentFilter = currentFilter, onClick = { viewModel.setFilter(LessonFilter.NOT_COMPLETED) })
                 }
-                LazyColumn {
-                    items(lessonList) { lessonItem ->
-                        LessonListItemView(lessonItem = lessonItem, navController = navController, userProgress = userProgress)
+                if (lessonList.isEmpty()) {
+                    Log.d("LessonsScreen", "No lessons to display")
+                    Text("Нет уроков")
+                } else {
+                    Log.d("LessonsScreen", "Displaying lessons")
+                    LazyColumn {
+                        items(lessonList) { lessonItem ->
+                            LessonListItemView(
+                                lessonItem = lessonItem,
+                                navController = navController,
+                                userProgress = userProgress,
+                                onLessonClick = {
+                                    navController.navigate("lessonDetail/${lessonItem.id}")
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -393,7 +399,6 @@ fun FilterButton(text: String, currentFilter: LessonFilter, onClick: () -> Unit)
 @Composable
 fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
     val viewModel: LessonViewModel = viewModel { LessonViewModel(lessonDocumentId) }
-    val lessonsViewModel: LessonsViewModel = viewModel()
 
     val lesson by viewModel.lesson.collectAsState()
     val sections by viewModel.sections.collectAsState()
@@ -438,6 +443,12 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Text(
+                    text = lesson?.lessonTitle ?: "Урок",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp)
+                )
                 sections.forEach { (sectionKey, lessonSection) ->
                     lessonSection.content?.let {
                         Text(
@@ -469,7 +480,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                                 onSuccess = { imageLoading = false },
                                 onError = {
                                     Log.d("ImageViewerScreen", "Error loading image: $imageUrl")
-                                    imageLoading = false // Укажем, что загрузка завершена с ошибкой
+                                    imageLoading = false //  загрузка завершена с ошибкой
                                 }
                             )
                             if (imageLoading) {
@@ -486,62 +497,14 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                         Text("Перейти к практике")
                     }
                 }
-
-                Button(onClick = {
-                    lesson?.id?.let { lessonId ->
-                        lessonsViewModel.markLessonCompleted(lessonId)
-                        navController.popBackStack()
-                    }
-
-                }) {
-                    Text("Завершить урок")
-                }
             }
         }
     }
 }
 
-//@Composable
-//fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress) {
-//    val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessons.contains(lessonItem.previousLessonId)
-//
-//    Card(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(8.dp),
-//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-//        enabled = isUnlocked,
-//        onClick = {
-//            if (isUnlocked) {
-//                navController.navigate("lessonDetail/${lessonItem.id}")
-//            }
-//        }
-//    ) {
-//        Row(
-//            modifier = Modifier.fillMaxWidth(),
-//            horizontalArrangement = Arrangement.SpaceBetween
-//        ) {
-//            Column(modifier = Modifier.padding(16.dp)) {
-//                Text(
-//                    text = lessonItem.lessonTitle,
-//                    style = MaterialTheme.typography.titleMedium,
-//                    fontSize = 18.sp
-//                )
-//            }
-//            if (!isUnlocked) {
-//                Icon(
-//                    imageVector = Icons.Filled.Lock,
-//                    contentDescription = "Заблокировано",
-//                    modifier = Modifier
-//                        .padding(16.dp)
-//                )
-//            }
-//        }
-//    }
-//}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress) {
+fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress, onLessonClick: () -> Unit) {
     val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessons.contains(lessonItem.previousLessonId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -562,7 +525,6 @@ fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostControl
             if (isUnlocked) {
                 navController.navigate("lessonDetail/${lessonItem.id}")
             } else {
-                // Optional: Show a message that the lesson is locked
                 scope.launch {
                     Toast.makeText(context, "Этот урок пока недоступен", Toast.LENGTH_SHORT).show()
                 }
