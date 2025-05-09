@@ -3,6 +3,7 @@ package com.example.slngify_kp.screens
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,15 +73,28 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.material3.*
+import androidx.compose.ui.viewinterop.AndroidView
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.ui.StyledPlayerView
+import androidx.compose.runtime.DisposableEffect
+
 
 // Модели данных
 data class LessonSection(
     val title: String? = null,
     val content: String? = null,
     val imageUrl: String? = null,
-    val order: Int? = null
-)
+    val order: Int? = null,
+    val videoUrl: String? = null,
+    val tableData: List<TableRow>? = null,
 
+    )
+data class TableRow(
+    val englishText: String?,
+    val translation: String?
+)
 data class Lesson(
     val lessonTitle: String,
     val practiceSectionId: String,
@@ -144,7 +158,7 @@ class LessonsViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("LessonsViewModel", "Error loading data", e)
             } finally {
-                _loading.value = false // Set loading to false
+                _loading.value = false
                 Log.d("LessonsViewModel", "loadData finished")
             }
         }
@@ -167,7 +181,7 @@ class LessonsViewModel : ViewModel() {
                     achievements.add(AchievementData(name, icon))
                 }
             }
-            Log.d("LessonsViewModel", "loadUserProgress finished") // Added log
+            Log.d("LessonsViewModel", "loadUserProgress finished")
             UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements)
         } catch (e: Exception) {
             Log.e("LessonsViewModel", "Error getting user progress", e)
@@ -176,11 +190,11 @@ class LessonsViewModel : ViewModel() {
     }
 
     private fun loadLessonsFlow(completedLessons: List<String>): kotlinx.coroutines.flow.Flow<List<LessonListItem>> = flow {
-        Log.d("LessonsViewModel", "loadLessonsFlow called") // Added log
+        Log.d("LessonsViewModel", "loadLessonsFlow called")
         _loading.value = true
         try {
             val documents = firestore.collection("lessons").get().await()
-            Log.d("LessonsViewModel", "Number of lessons found: ${documents.size()}") // Added log
+            Log.d("LessonsViewModel", "Number of lessons found: ${documents.size()}")
             val lessons = mutableListOf<LessonListItem>()
 
             for (document in documents) {
@@ -192,7 +206,7 @@ class LessonsViewModel : ViewModel() {
                     lessonTitle = (lessonData["sectionA"] as Map<*, *>).get("title") as? String ?: "No title"
                 }
 
-                val sectionCount = lessonData.count { it.key.startsWith("section") } // Count sections
+                val sectionCount = lessonData.count { it.key.startsWith("section") } // Подсчет секций
                 val previousLessonId = document.getString("previousLessonId")
 
                 val isCompleted = completedLessons.contains(lessonId)
@@ -294,21 +308,56 @@ class LessonViewModel(private val lessonDocumentId: String) : ViewModel() {
                             if (sectionData != null) {
                                 val content = sectionData["content"] as? String
                                 val imageUrl = sectionData["imageUrl"] as? String
+                                val videoUrl = sectionData["videoUrl"] as? String
                                 val title = sectionData["title"] as? String
                                 val order = (sectionData["order"] as? Number)?.toInt()
-                                lessonSections.add(Pair(key, LessonSection(title = title, content = content, imageUrl = imageUrl, order = order)))
-                                Log.d("LessonViewModel", "Секция $key: content = $content, image = $imageUrl")
+
+                                // Table Data
+                                val tableData = sectionData["tableData"] as? List<Map<String, String>>
+                                val tableDataList = if (tableData != null) {
+                                    val list = mutableListOf<TableRow>()
+                                    tableData.forEach { row ->
+                                        val englishText = row["englishText"] as? String
+                                        val translation = row["translation"] as? String
+                                        list.add(TableRow(englishText, translation))
+                                    }
+                                    list
+                                } else {
+                                    null
+                                }
+
+                                lessonSections.add(
+                                    Pair(
+                                        key,
+                                        LessonSection(
+                                            title = title,
+                                            content = content,
+                                            imageUrl = imageUrl,
+                                            videoUrl = videoUrl,
+                                            tableData = tableDataList,
+                                            order = order
+                                        )
+                                    )
+                                )
+                                Log.d(
+                                    "LessonViewModel",
+                                    "Секция $key: content = $content, image = $imageUrl, videoUrl = $videoUrl"
+                                )
                             }
                         }
                     }
+                    lessonSections.sortBy { it.second.order }
                 }
-                lessonSections.sortBy { it.second.order }
             } catch (e: Exception) {
                 _error.value = "Ошибка загрузки секции: ${e.message}"
                 Log.e("LessonViewModel", "Error getting section", e)
+            } finally {
+                _sections.value = lessonSections
+                Log.d(
+                    "LessonViewModel",
+                    "Загружено секций: $lessonSections, общее число: ${_sections.value.size}"
+                )
             }
-            _sections.value = lessonSections
-            Log.d("LessonViewModel", "Загружено секций: $lessonSections, общее число: ${_sections.value.size}")
         }
     }
 }
@@ -393,7 +442,69 @@ fun FilterButton(text: String, currentFilter: LessonFilter, onClick: () -> Unit)
 }
 
 
+@Composable
+fun VideoPlayer(videoUrl: String) {
+    val context = LocalContext.current
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            val mediaItem = MediaItem.fromUri(videoUrl)
+            setMediaItem(mediaItem)
+            prepare()
+            playWhenReady = false
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+    AndroidView(
+        factory = { context ->
+            StyledPlayerView(context).apply {
+                player = exoPlayer
+                useController = true
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth() // Занимает всю доступную ширину
+            .height(300.dp) // Устанавливаем высоту
+            .padding(horizontal = 16.dp) // Добавляем отступы по краям
+    )
+}
 
+@Composable
+fun TableView(tableData: List<TableRow>?) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp) // Отступы по краям таблицы
+            .border(1.dp, Color.Gray) // Рамка вокруг таблицы
+    ) {
+        if (tableData != null) {
+            Column(modifier = Modifier.padding(8.dp)) { // Отступы внутри таблицы
+                // Заголовки таблицы
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Текст на английском", Modifier.weight(1f))
+                    Text("Перевод", Modifier.weight(1f))
+                }
+                Divider()
+                tableData.forEach { row ->
+                    TableRowView(row = row)
+                    Divider()
+                }
+            }
+        } else {
+            Text("Нет данных для отображения")
+        }
+    }
+}
+@Composable
+fun TableRowView(row: TableRow) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(row.englishText ?: "", Modifier.weight(1f))
+        Text(row.translation ?: "", Modifier.weight(1f))
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -406,7 +517,6 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
     val scrollState = rememberScrollState()
     val error by viewModel.error.collectAsState()
     val practiceSectionId = lesson?.practiceSectionId
-
 
     Scaffold(
         topBar = {
@@ -445,8 +555,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
             ) {
                 Text(
                     text = lesson?.lessonTitle ?: "Урок",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(16.dp)
                 )
                 sections.forEach { (sectionKey, lessonSection) ->
@@ -488,9 +597,16 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                             }
                         }
                     }
+                    lessonSection.videoUrl?.let { videoUrl ->
+                        VideoPlayer(videoUrl = videoUrl)
+                    }
+                    lessonSection.tableData?.let { tableData ->
+                        TableView(tableData = tableData)
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
                 }
-                if(practiceSectionId?.isNotEmpty() == true){
+                if (practiceSectionId?.isNotEmpty() == true) {
                     Button(onClick = {
                         navController.navigate("sectionDetail/$practiceSectionId?lessonId=${lesson?.id}")
                     }) {

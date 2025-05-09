@@ -87,6 +87,7 @@ data class Section(
     val questions: List<Question> = emptyList(),
     val previousSectionId: String? = null
 
+
 )
 
 data class Question(
@@ -95,7 +96,6 @@ data class Question(
     val options: List<String> = emptyList(),
     val correctAnswer: String = "",
     val imageUrl: String = ""
-
 )
 
 
