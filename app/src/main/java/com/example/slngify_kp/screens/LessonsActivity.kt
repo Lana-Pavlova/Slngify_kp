@@ -74,11 +74,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.compose.material3.*
-import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.ui.StyledPlayerView
-import androidx.compose.runtime.DisposableEffect
+import com.example.slngify_kp.viewmodel.YouTubeWebView
 
 
 // Модели данных
@@ -443,36 +439,6 @@ fun FilterButton(text: String, currentFilter: LessonFilter, onClick: () -> Unit)
 
 
 @Composable
-fun VideoPlayer(videoUrl: String) {
-    val context = LocalContext.current
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(videoUrl)
-            setMediaItem(mediaItem)
-            prepare()
-            playWhenReady = false
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-    AndroidView(
-        factory = { context ->
-            StyledPlayerView(context).apply {
-                player = exoPlayer
-                useController = true
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth() // Занимает всю доступную ширину
-            .height(300.dp) // Устанавливаем высоту
-            .padding(horizontal = 16.dp) // Добавляем отступы по краям
-    )
-}
-
-@Composable
 fun TableView(tableData: List<TableRow>?) {
     Surface(
         modifier = Modifier
@@ -517,6 +483,9 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
     val scrollState = rememberScrollState()
     val error by viewModel.error.collectAsState()
     val practiceSectionId = lesson?.practiceSectionId
+    var youtubeError by remember { mutableStateOf<String?>(null) } //Состояние для ошибок YouTubeWebView
+
+    val videoId = sections.firstOrNull { !it.second.videoUrl.isNullOrEmpty() }?.second?.videoUrl
 
     Scaffold(
         topBar = {
@@ -558,6 +527,15 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(16.dp)
                 )
+                if (!videoId.isNullOrEmpty()) {
+                    YouTubeWebView(videoId = videoId, onError = { errorMessage ->
+                        youtubeError = errorMessage
+                    })
+                    if (youtubeError != null) {
+                        Text(text = "YouTube Error: ${youtubeError!!}", color = Color.Red)
+                    }
+                }
+
                 sections.forEach { (sectionKey, lessonSection) ->
                     lessonSection.content?.let {
                         Text(
@@ -589,16 +567,13 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                                 onSuccess = { imageLoading = false },
                                 onError = {
                                     Log.d("ImageViewerScreen", "Error loading image: $imageUrl")
-                                    imageLoading = false //  загрузка завершена с ошибкой
+                                    imageLoading = false
                                 }
                             )
                             if (imageLoading) {
                                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                             }
                         }
-                    }
-                    lessonSection.videoUrl?.let { videoUrl ->
-                        VideoPlayer(videoUrl = videoUrl)
                     }
                     lessonSection.tableData?.let { tableData ->
                         TableView(tableData = tableData)
