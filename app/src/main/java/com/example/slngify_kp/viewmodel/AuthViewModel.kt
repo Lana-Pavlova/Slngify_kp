@@ -92,10 +92,9 @@ class AuthViewModel : ViewModel() {
     }
 
     // Функция выхода
-    // доделать на выход из аккаунта и оставаться на странице профиля (пустой)
     fun signOutUser(navController: NavController) {
         auth.signOut()
-        navController.navigate("home") {
+        navController.navigate("profilePage") {
             popUpTo(0)
         }
     }

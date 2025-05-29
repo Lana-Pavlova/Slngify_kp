@@ -1,5 +1,6 @@
 package com.example.slngify_kp.screens
 
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -27,11 +28,13 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -64,6 +67,7 @@ import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
 import com.example.slngify_kp.viewmodel.AchievementData
 import com.example.slngify_kp.viewmodel.UserProgress
+import com.example.slngify_kp.viewmodel.YouTubeWebView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -73,8 +77,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import androidx.compose.material3.*
-import com.example.slngify_kp.viewmodel.YouTubeWebView
 
 
 // Модели данных
@@ -147,9 +149,9 @@ class LessonsViewModel : ViewModel() {
                 val userProgress = loadUserProgress(userId)
                 _userProgress.value = userProgress
 
-                loadLessonsFlow(completedLessons = userProgress.completedLessons)
+                loadLessonsFlow(completedLessons = userProgress.completedLessonIds)
                     .collect { lessons ->
-                        _lessonList.value = filterLessons(lessons, userProgress.completedLessons) // Вызываем filterLessons
+                        _lessonList.value = filterLessons(lessons, userProgress.completedLessonIds) // Вызываем filterLessons
                     }
             } catch (e: Exception) {
                 Log.e("LessonsViewModel", "Error loading data", e)
@@ -178,7 +180,7 @@ class LessonsViewModel : ViewModel() {
                 }
             }
             Log.d("LessonsViewModel", "loadUserProgress finished")
-            UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements)
+            UserProgress(completedLessonIds = completedLessons, completedTasks = completedTasks, achievements = achievements)
         } catch (e: Exception) {
             Log.e("LessonsViewModel", "Error getting user progress", e)
             UserProgress()
@@ -545,6 +547,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                         )
                     }
                     lessonSection.imageUrl?.let { imageUrl ->
+                        val encodedImageUrl = Uri.encode(imageUrl)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -562,11 +565,11 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clickable {
-                                        navController.navigate("imageViewer/$imageUrl")
+                                        navController.navigate("imageViewer/$encodedImageUrl")
                                     },
                                 onSuccess = { imageLoading = false },
                                 onError = {
-                                    Log.d("ImageViewerScreen", "Error loading image: $imageUrl")
+                                    Log.e("LessonScreen", "Error loading image: $imageUrl") // Log error
                                     imageLoading = false
                                 }
                             )
@@ -596,7 +599,7 @@ fun LessonScreen(lessonDocumentId: String, navController: NavHostController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LessonListItemView(lessonItem: LessonListItem, navController: NavHostController, userProgress: UserProgress, onLessonClick: () -> Unit) {
-    val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessons.contains(lessonItem.previousLessonId)
+    val isUnlocked = lessonItem.previousLessonId == null || userProgress.completedLessonIds.contains(lessonItem.previousLessonId)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 

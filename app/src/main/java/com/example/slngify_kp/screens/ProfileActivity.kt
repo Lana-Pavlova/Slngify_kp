@@ -2,29 +2,55 @@ package com.example.slngify_kp.screens
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -35,7 +61,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.rememberAsyncImagePainter
@@ -45,10 +70,10 @@ import com.example.slngify_kp.ui.theme.MyTheme
 import com.example.slngify_kp.ui.theme.lightScheme
 import com.example.slngify_kp.viewmodel.AchievementData
 import com.example.slngify_kp.viewmodel.AuthViewModel
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
 import com.example.slngify_kp.viewmodel.ProgressViewModel
 import com.example.slngify_kp.viewmodel.UserProgress
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 
 
 class ProfilePageActivity : ComponentActivity() {
@@ -72,16 +97,16 @@ fun ProfilePage(navController: NavHostController) {
     val newLessonsCompleted by viewModel.newLessonsCompleted.collectAsState()
     val totalLessons by viewModel.totalLessons.collectAsState()
 
-    // Состояние
+    Log.d("ProfilePage", "newLessonsCompleted: $newLessonsCompleted, totalLessons: $totalLessons")
+
     var showAuthorInfo by remember { mutableStateOf(false) }
     var showAuthForm by remember { mutableStateOf(false) }
     var isRegistering by remember { mutableStateOf(false) }
 
-    // Получение имени и email пользователя (лучше вынести в ViewModel)
     var userName by remember { mutableStateOf("Your name") }
     var userEmail by remember { mutableStateOf("your@email.com") }
     val userId = Firebase.auth.currentUser?.uid
-    val context = LocalContext.current // Для Toast
+    val context = LocalContext.current
 
     var selectedItem by remember { mutableStateOf("profilePage") }
 
@@ -147,6 +172,8 @@ fun ProfileContent(
     newLessonsCompleted: Int,
     totalLessons: Int
 ) {
+    Log.d("ProfileContent", "newLessonsCompleted: $newLessonsCompleted, totalLessons: $totalLessons")
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -163,8 +190,8 @@ fun ProfileContent(
             userName = userName,
             userEmail = userEmail,
             onShowAuthorInfoChanged = onShowAuthorInfoChanged,
-            onUserNameChanged = onUserNameChanged, // Передаем обработчик имени
-            onUserEmailChanged = onUserEmailChanged, // Передаем обработчик почты
+            onUserNameChanged = onUserNameChanged,
+            onUserEmailChanged = onUserEmailChanged,
             context = context
         )
 
@@ -185,8 +212,6 @@ fun ProfileContent(
         AchievementsSection(achievements = userProgress.achievements)
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        ProgressSection(userProgress = userProgress)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -275,33 +300,7 @@ fun StatisticCard(icon: ImageVector, count: Int, label: String) {
     }
 }
 @Composable
-fun ProgressSection(userProgress: UserProgress) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Text("Прогресс", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-        Text("Пройдено разделов: ${userProgress.completedSections.size}", style = MaterialTheme.typography.bodyMedium)
-
-        if (userProgress.completedLessons.isNotEmpty()) {
-            Text("Пройденные уроки:", style = MaterialTheme.typography.titleMedium)
-            userProgress.completedLessons.forEach { lessonId ->
-                Text(text = "Урок $lessonId", style = MaterialTheme.typography.bodyMedium)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-
-        if (userProgress.completedSections.isNotEmpty()) {
-            Text("Пройденные разделы:", style = MaterialTheme.typography.titleMedium)
-            userProgress.completedSections.forEach { sectionId ->
-                Text(text = "Раздел $sectionId", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-@Composable
-fun AchievementsSection(achievements: List<AchievementData>) { // Изменили тип на List<AchievementData>
+fun AchievementsSection(achievements: List<AchievementData>) {
     Column(
         modifier = Modifier.padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -312,8 +311,8 @@ fun AchievementsSection(achievements: List<AchievementData>) { // Изменил
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            achievements.forEach { achievement -> // Изменили название переменной на achievement
-                AchievementButton(achievement = achievement) // Передаем achievement в AchievementButton
+            achievements.forEach { achievement ->
+                AchievementButton(achievement = achievement)
             }
         }
     }
@@ -337,85 +336,7 @@ fun AchievementButton(achievement: AchievementData) {
     }
 }
 
-@Composable
-fun BottomNavigationBar(navController: NavController, selectedItem: String, onItemSelected: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        NavigationButton(
-            navController = navController,
-            route = "home",
-            selected = selectedItem == "home",
-            icon = R.drawable.home,
-            onItemSelected = onItemSelected
-        )
 
-        NavigationButton(
-            navController = navController,
-            route = "dictionaryPage",
-            selected = selectedItem == "dictionaryPage",
-            icon = R.drawable.dictionary,
-            onItemSelected = onItemSelected
-        )
-
-        NavigationButton(
-            navController = navController,
-            route = "lessonsList",
-            selected = selectedItem == "lessonsList",
-            icon = R.drawable.lessons,
-            onItemSelected = onItemSelected
-        )
-        NavigationButton(
-            navController = navController,
-            route = "sectionsList",
-            selected = selectedItem == "sectionsList",
-            icon = R.drawable.practice,
-            onItemSelected = onItemSelected
-        )
-        NavigationButton(
-            navController = navController,
-            route = "profilePage",
-            selected = selectedItem == "profilePage",
-            icon = R.drawable.profile,
-            onItemSelected = onItemSelected
-        )
-    }
-}
-
-@Composable
-fun NavigationButton(
-    navController: NavController,
-    route: String,
-    selected: Boolean,
-    icon: Int,
-    onItemSelected: (String) -> Unit
-) {
-    Button(
-        onClick = {
-            navController.navigate(route) {
-                popUpTo(navController.graph.startDestinationId)
-                launchSingleTop = true
-            }
-            onItemSelected(route)
-        },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-            contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-        ),
-        modifier = Modifier.size(64.dp) // Задаем размер кнопки
-    ) {
-        Icon(
-            painter = painterResource(id = icon),
-            contentDescription = null, // Убираем описание
-            modifier = Modifier.size(64.dp), // Задаем размер иконки
-            tint = Color.Unspecified
-        )
-    }
-}
 @Composable
 fun AuthForm(onRegisterClick: () -> Unit) {
     val authViewModel: AuthViewModel = viewModel()
@@ -423,13 +344,12 @@ fun AuthForm(onRegisterClick: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Наблюдаем за состояниями из ViewModel
     val isLoading by authViewModel.loginLoading.observeAsState(false)
     val errorMessage = authViewModel.loginError.observeAsState(initial = null)
     val errorMessageValue = errorMessage.value
     val context = LocalContext.current
 
-    Surface( // Surface для стилизации
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface
@@ -652,13 +572,12 @@ fun RegistrationForm(onRegisterComplete: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Наблюдаем за состояниями из ViewModel
     val isLoading by authViewModel.registrationLoading.observeAsState(false)
     val errorMessage = authViewModel.registrationError.observeAsState(initial = null)
     val errorMessageValue = errorMessage.value
     val context = LocalContext.current
 
-    Surface( // Surface для стилизации
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface
@@ -725,7 +644,7 @@ fun RegistrationForm(onRegisterComplete: () -> Unit) {
 fun MyAppTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightScheme,
-        typography = AppTypography, // Если есть своя типография
+        typography = AppTypography,
         content = content
     )
 }

@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
 
 class WordOfTheDayWidget : AppWidgetProvider() {
     private val workRequest = OneTimeWorkRequestBuilder<WordOfTheDayWorker>()
-        .setInitialDelay(1, TimeUnit.HOURS)
+        .setInitialDelay(24, TimeUnit.HOURS)
         .build()
 
     override fun onUpdate(

@@ -13,24 +13,35 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 
-// добавить статистику выполнения заданий (где были ошибки и тд)
 data class UserProgress(
-    val completedLessons: List<String> = emptyList(),
+    val completedLessonIds: List<String> = emptyList(),
     val completedTasks: List<String> = emptyList(),
     val achievements: List<AchievementData> = emptyList(),
-    val completedSections: List<String> = emptyList() // Добавили completedSections
-
+    val completedSectionIds: List<String> = emptyList()
 )
+
 data class AchievementData(
     val name: String,
     val icon: String
+)
+
+data class Lesson(
+    val id: String,
+    val title: String,
+    var isCompleted: Boolean = false
+)
+
+data class Section(
+    val id: String,
+    val title: String,
+    var isCompleted: Boolean = false
 )
 
 class ProgressViewModel : ViewModel() {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-    private val userId = auth.currentUser?.uid ?: "default_user_id" // Обработка отсутствия пользователя
+    private val userId = auth.currentUser?.uid ?: "default_user"
 
     private val _userProgress = MutableStateFlow(UserProgress())
     val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
@@ -38,8 +49,11 @@ class ProgressViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _lessonList = MutableStateFlow<List<String>>(emptyList())
-    val lessonList: StateFlow<List<String>> = _lessonList.asStateFlow()
+    private val _lessonList = MutableStateFlow<List<Lesson>>(emptyList())
+    val lessonList: StateFlow<List<Lesson>> = _lessonList.asStateFlow()
+
+    private val _sectionList = MutableStateFlow<List<Section>>(emptyList())
+    val sectionList: StateFlow<List<Section>> = _sectionList.asStateFlow()
 
     private val _totalLessons = MutableStateFlow(0)
     val totalLessons: StateFlow<Int> = _totalLessons.asStateFlow()
@@ -55,18 +69,20 @@ class ProgressViewModel : ViewModel() {
         viewModelScope.launch {
             loadUserProgress()
             loadTotalLessons()
+            loadLessons()
+            loadSections()
         }
     }
 
     private suspend fun loadUserProgress() {
+        Log.d("ProgressViewModel", "loadUserProgress called")
         try {
             val userDocument = firestore.collection("users").document(userId).get().await()
+            Log.d("ProgressViewModel", "User document loaded successfully")
 
-            val completedLessons = userDocument.get("completedLessonIds") as? List<String> ?: emptyList()
-            val completedTasks = userDocument.get("completedTaskIds") as? List<String> ?: emptyList()
+            val completedLessonIds = userDocument.get("completedLessonIds") as? List<String> ?: emptyList()
+            val completedSectionIds = userDocument.get("completedSectionIds") as? List<String> ?: emptyList()
             val achievementIds = userDocument.get("achievementIds") as? List<String> ?: emptyList()
-
-            // Загружаем информацию о каждом достижении по его ID
             val achievements = mutableListOf<AchievementData>()
             for (achievementId in achievementIds) {
                 val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
@@ -76,109 +92,99 @@ class ProgressViewModel : ViewModel() {
                     achievements.add(AchievementData(name, icon))
                 }
             }
-
-            _userProgress.value = UserProgress(completedLessons = completedLessons, completedTasks = completedTasks, achievements = achievements)
-
+            _userProgress.value = UserProgress(completedLessonIds = completedLessonIds, completedSectionIds = completedSectionIds, achievements = achievements)
+            _newLessonsCompleted.value = completedLessonIds.size
+            Log.d("ProgressViewModel", "New lessons completed: ${_newLessonsCompleted.value}")
         } catch (e: Exception) {
             _errorMessage.value = "Failed to load user progress: ${e.message}"
-            // Log.e("MainViewModel", "Error loading user progress", e)
+            Log.e("ProgressViewModel", "Failed to load user progress: ${e.message}")
         }
     }
+
     private suspend fun loadTotalLessons() {
         try {
             val result = firestore.collection("lessons").get().await()
-            val lessons = result.documents.map { it.id }
+            val lessons = result.documents.mapNotNull { document ->
+                val lessonId = document.id
+                val lessonTitle = document.getString("title") ?: ""
+                val isCompleted = _userProgress.value.completedLessonIds.contains(lessonId)
+                Lesson(id = lessonId, title = lessonTitle, isCompleted = isCompleted)
+            }
             _lessonList.value = lessons
             _totalLessons.value = lessons.size
         } catch (e: Exception) {
             _errorMessage.value = "Failed to load lessons: ${e.message}"
             _totalLessons.value = 0
-            // Log.e("MainViewModel", "Error loading lessons", e)
         }
     }
 
-//    fun markLessonCompleted(lessonId: String) {
-//        markItemCompleted(lessonId, "completedLessonIds") { currentProgress ->
-//            currentProgress.copy(completedLessons = currentProgress.completedLessons + lessonId)
-//        }
-//        _newLessonsCompleted.value = _newLessonsCompleted.value + 1
-//    }
-//
-//    fun markTaskCompleted(taskId: String) {
-//        markItemCompleted(taskId, "completedTaskIds") { currentProgress ->
-//            currentProgress.copy(completedTasks = currentProgress.completedTasks + taskId)
-//        }
-//    }
+    private suspend fun loadLessons() {
+        try {
+            val snapshot = firestore.collection("lessons").get().await()
+            val lessons = snapshot.documents.map { document ->
+                val lessonId = document.id
+                val lessonTitle = document.getString("title") ?: ""
+                val isCompleted = _userProgress.value.completedLessonIds.contains(lessonId)
+                Lesson(id = lessonId, title = lessonTitle, isCompleted = isCompleted)
+            }
+            _lessonList.value = lessons
+        } catch (e: Exception) {
+            Log.e("ProgressViewModel", "Error loading lessons", e)
+        }
+    }
 
-//    private fun markItemCompleted(
-//        itemId: String,
-//        fieldName: String,
-//        updateProgress: (UserProgress) -> UserProgress
-//    ) {
-//        viewModelScope.launch {
-//            try {
-//                firestore.collection("users").document(userId)
-//                    .update(fieldName, FieldValue.arrayUnion(itemId)).await()
-//
-//                _userProgress.value = updateProgress(_userProgress.value)
-//
-//            } catch (e: Exception) {
-//                _errorMessage.value = "Failed to mark item completed: ${e.message}"
-//                 Log.e("ProgressViewModel", "Error marking item completed", e)
-//            }
-//        }
-//    }
+    private suspend fun loadSections() {
+        try {
+            val snapshot = firestore.collection("sections").get().await()
+            val sections = snapshot.documents.map { document ->
+                val sectionId = document.id
+                val sectionTitle = document.getString("title") ?: ""
+                val isCompleted = _userProgress.value.completedSectionIds.contains(sectionId)
+                Section(id = sectionId, title = sectionTitle, isCompleted = isCompleted)
+            }
+            _sectionList.value = sections
+        } catch (e: Exception) {
+            Log.e("ProgressViewModel", "Error loading sections", e)
+        }
+    }
+
     fun awardAchievement(sectionId: String) {
         viewModelScope.launch {
             val userId = auth.currentUser?.uid ?: return@launch
-
             try {
-                // 1. Получаем achievementId на основе sectionId (из Firestore)
                 val achievementId = getAchievementIdForSection(sectionId)
                 if (achievementId == null) {
-                    // Нет достижения для этой секции
                     Log.w("ProgressViewModel", "No achievement found for sectionId: $sectionId")
                     return@launch
                 }
-
-                // 2. Получаем данные о достижении из коллекции "achievements"
                 val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
                 if (!achievementDocument.exists()) {
                     Log.e("ProgressViewModel", "Achievement document not found for achievementId: $achievementId")
                     return@launch
                 }
-
                 val name = achievementDocument.getString("name") ?: ""
                 val icon = achievementDocument.getString("icon") ?: ""
                 val achievementData = AchievementData(name, icon)
-
-                // 3. Добавляем ID достижения в массив достижений пользователя
                 firestore.collection("users").document(userId)
                     .update("achievementIds", FieldValue.arrayUnion(achievementId)).await()
-
-                // 4. Обновить _userProgress (оптимистичное обновление)
                 val currentAchievements = _userProgress.value.achievements.toMutableList()
                 currentAchievements.add(achievementData) // Добавляем achievementData
                 _userProgress.value = _userProgress.value.copy(achievements = currentAchievements)
-
             } catch (e: Exception) {
                 Log.e("ProgressViewModel", "Error awarding achievement", e)
             }
         }
     }
+
     private suspend fun getAchievementIdForSection(sectionId: String): String? {
         return try {
-            // Ищем документ в коллекции "achievements", где sectionId соответствует заданному
             val querySnapshot = firestore.collection("achievements")
                 .whereEqualTo("sectionId", sectionId)
                 .get()
                 .await()
-
             if (querySnapshot.documents.isNotEmpty()) {
-                // Если найден документ, возвращаем его ID
                 querySnapshot.documents[0].id
             } else {
-                // Если документ не найден, возвращаем null
                 null
             }
         } catch (e: Exception) {
@@ -186,6 +192,32 @@ class ProgressViewModel : ViewModel() {
             null
         }
     }
+    fun markLessonCompleted(lessonId: String) {
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid ?: return@launch
 
+            try {
+                firestore.collection("users").document(userId)
+                    .update(
+                        "completedLessonIds", FieldValue.arrayUnion(lessonId)
+                    )
+                    .await()
 
+                _userProgress.value = _userProgress.value.copy(
+                    completedLessonIds = _userProgress.value.completedLessonIds + lessonId
+                )
+
+                _lessonList.value = _lessonList.value.map { lesson ->
+                    if (lesson.id == lessonId) {
+                        lesson.copy(isCompleted = true)
+                    } else {
+                        lesson
+                    }
+                }
+                loadUserProgress()
+            } catch (e: Exception) {
+                Log.e("ProgressViewModel", "Error mark lesson completed", e)
+            }
+        }
+    }
 }

@@ -1,7 +1,6 @@
 package com.example.slngify_kp.screens
 
 import android.os.Bundle
-import com.example.slngify_kp.ui.theme.MyTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -12,12 +11,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -44,11 +45,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.slngify_kp.R
+import com.example.slngify_kp.ui.theme.MyTheme
+import com.example.slngify_kp.widget.WordOfTheDayWidget
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
-import androidx.compose.material3.CircularProgressIndicator
-import com.example.slngify_kp.widget.WordOfTheDayWidget
 
 data class WordOfTheDay(
     val definition : String? = null,
@@ -70,29 +71,77 @@ class HomePageActivity : ComponentActivity() {
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NavigationComponent() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "home") {
-        composable("home") { HomePageScreen(navController) }
-        composable("lessonsList") { LessonsScreen(navController) }
-        composable("sectionsList") { SectionsScreen(navController) }
-        composable("dictionaryPage") { DictionaryScreen(navController) }
-        composable("profilePage") { ProfilePage(navController = navController) }
-        composable("lessonDetail/{lessonDocumentId}") { backStackEntry ->
-            val lessonDocumentId = backStackEntry.arguments?.getString("lessonDocumentId") ?: ""
-            LessonScreen(lessonDocumentId = lessonDocumentId, navController = navController)
+    var selectedItem = remember { mutableStateOf("") }
+
+    val shouldShowBottomBar = remember { mutableStateOf(true) }
+
+    Scaffold(
+        bottomBar = {
+            if (shouldShowBottomBar.value) {
+                BottomNavigationBar(
+                    navController = navController,
+                    selectedItem = selectedItem.value,
+                    onItemSelected = { route -> selectedItem.value = route }
+                )
+            }
         }
-        composable("sectionDetail/{sectionId}") { backStackEntry ->
-            val sectionId = backStackEntry.arguments?.getString("sectionId") ?: ""
-            SectionDetailScreen(sectionId = sectionId, navController = navController)
-        }
-        composable("imageViewer/{imageUrl}") { backStackEntry ->
-            val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
-            ImageViewerScreen(imageUrl = imageUrl, navController = navController)
+    ) { paddingValues ->
+        NavHost(
+            navController = navController,
+            startDestination = "home",
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            composable("home") {
+                shouldShowBottomBar.value = false
+                selectedItem.value = ""
+                HomePageScreen(navController)
+            }
+            composable("lessonsList") {
+                shouldShowBottomBar.value = true
+                selectedItem.value = ""
+                LessonsScreen(navController)
+            }
+            composable("sectionsList") {
+                shouldShowBottomBar.value = true
+                selectedItem.value = ""
+                SectionsScreen(navController)
+            }
+            composable("dictionaryPage") {
+                shouldShowBottomBar.value = true
+                selectedItem.value = ""
+                DictionaryScreen(navController)
+            }
+            composable("profilePage") {
+                shouldShowBottomBar.value = false
+                selectedItem.value = ""
+                ProfilePage(navController = navController)
+            }
+            composable("lessonDetail/{lessonDocumentId}") { backStackEntry ->
+                shouldShowBottomBar.value = false
+                selectedItem.value = ""
+                val lessonDocumentId = backStackEntry.arguments?.getString("lessonDocumentId") ?: ""
+                LessonScreen(lessonDocumentId = lessonDocumentId, navController = navController)
+            }
+            composable("sectionDetail/{sectionId}") { backStackEntry ->
+                shouldShowBottomBar.value = false
+                selectedItem.value = ""
+                val sectionId = backStackEntry.arguments?.getString("sectionId") ?: ""
+                SectionDetailScreen(sectionId = sectionId, navController = navController)
+            }
+            composable("imageViewer/{imageUrl}") { backStackEntry ->
+                shouldShowBottomBar.value = false
+                selectedItem.value = ""
+                val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
+                ImageViewerScreen(imageUrl = imageUrl)
+            }
         }
     }
 }
+
 suspend fun fetchRandomWordOfTheDay(): WordOfTheDay? {
     return try {
         val querySnapshot = Firebase.firestore.collection("wordOfTheDay")
@@ -160,13 +209,8 @@ fun HomePageScreen(navController: NavController) {
                 }
                 else {
                     wordOfTheDay?.let { word ->
-                        Text(
-                            text = "✨ Слово дня: ${word.word} ✨\n${word.definition}\nПеревод: ${word.translation}",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            textAlign = TextAlign.Center,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .padding(vertical = 16.dp)
                                 .background(
@@ -179,15 +223,50 @@ fun HomePageScreen(navController: NavController) {
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .padding(16.dp)
-                        )
-                        if (!word.examples.isNullOrBlank()) {
-                            Text(
-                                text = "Примеры: ${word.examples}",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
+                        ) {
+                            if (!word.word.isNullOrBlank()) {
+                                Text(
+                                    text = "✨ Слово дня: ${word.word} ✨",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    textAlign = TextAlign.Center
                                 )
-                            )
+                            }
+
+                            if (!word.definition.isNullOrBlank()) {
+                                Text(
+                                    text = "${word.definition}",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+
+                            if (!word.translation.isNullOrBlank()) {
+                                Text(
+                                    text = "Перевод: ${word.translation}",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+
+                            if (!word.examples.isNullOrBlank()) {
+                                Text(
+                                    text = "Примеры: ${word.examples}",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
@@ -198,16 +277,38 @@ fun HomePageScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    MainMenuButton("Словарь", R.drawable.dictionary) {
+                    MainMenuButton(
+                        text = "Словарь",
+                        iconRes = R.drawable.dictionary,
+                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
+                    ) {
                         navController.navigate("dictionaryPage")
                     }
-                    MainMenuButton("Уроки", R.drawable.lessons) {
+                    MainMenuButton(
+                        text = "Уроки",
+                        iconRes = R.drawable.lessons,
+                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
+                    ) {
                         navController.navigate("lessonsList")
                     }
-                    MainMenuButton("Практика", R.drawable.practice){
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    MainMenuButton(
+                        text = "Практика",
+                        iconRes = R.drawable.practice,
+                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
+                    ) {
                         navController.navigate("sectionsList")
                     }
-                    MainMenuButton("Личный кабинет", R.drawable.profile) {
+                    MainMenuButton(
+                        text = "Личный кабинет",
+                        iconRes = R.drawable.profile,
+                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
+                    ) {
                         navController.navigate("profilePage")
                     }
                 }
@@ -215,10 +316,16 @@ fun HomePageScreen(navController: NavController) {
         }
     )
 }
+
 @Composable
-fun MainMenuButton(text: String, iconRes: Int, onClick: () -> Unit) {
+fun MainMenuButton(
+    text: String,
+    iconRes: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clickable(onClick = onClick)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -235,7 +342,6 @@ fun MainMenuButton(text: String, iconRes: Int, onClick: () -> Unit) {
         )
     }
 }
-
 @Preview(showBackground = true)
 @Composable
 fun HomePagePreview() {

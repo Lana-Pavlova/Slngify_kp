@@ -38,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +68,6 @@ import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
 import com.example.slngify_kp.viewmodel.ProgressViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -474,7 +472,7 @@ fun ResultScreen(
     lessonId: String?
 ) {
     val progress = if (numberOfQuestions > 0) numberOfCorrectAnswers.toFloat() / numberOfQuestions else 0f
-    val sectionsViewModel : SectionsViewModel = viewModel()
+    val sectionsViewModel: SectionsViewModel = viewModel()
     val viewModel: ProgressViewModel = viewModel()
 
     Column(
@@ -518,23 +516,34 @@ fun ResultScreen(
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = if (numberOfCorrectAnswers == numberOfQuestions)
-                "Отлично, все ответы верны!"
-            else if (numberOfCorrectAnswers >= numberOfQuestions / 2)
-                "Хороший результат, но есть куда расти."
-            else
-                "Похоже, что тебе нужно повторить материал."
-        )
+
+        val resultText = if (numberOfCorrectAnswers == numberOfQuestions)
+            "Отлично, все ответы верны!"
+        else if (numberOfCorrectAnswers >= numberOfQuestions / 2)
+            "Хороший результат, но есть куда расти."
+        else
+            "Похоже, что тебе нужно повторить материал."
+
+        Text(text = resultText)
+
         Spacer(modifier = Modifier.height(16.dp))
+
         Button(onClick = {
             // 1. Отмечаем секцию как пройденную
-            sectionsViewModel.markSectionCompleted(sectionId) // Лучше использовать MainViewModel
+            sectionsViewModel.markSectionCompleted(sectionId)
 
             // 2. Выдаем достижение
             viewModel.awardAchievement(sectionId)
 
-            // 3. Возвращаемся к списку разделов
+            // 3. Отмечаем урок как пройденный, если результат хороший
+            if (resultText != "Похоже, что тебе нужно повторить материал." && lessonId != null) {
+                Log.d("ResultScreen", "Marking lesson completed: lessonId = $lessonId")
+                viewModel.markLessonCompleted(lessonId)
+            } else {
+                Log.d("ResultScreen", "Not marking lesson completed: resultText = $resultText, lessonId = $lessonId")
+            }
+
+            // 4. Возвращаемся к списку разделов
             navController.popBackStack()
         }) {
             Text("Вернуться к списку разделов")
@@ -656,7 +665,7 @@ fun QuestionScreen(
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageViewerScreen(imageUrl: String, navController: NavHostController) {
+fun ImageViewerScreen(imageUrl: String) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
