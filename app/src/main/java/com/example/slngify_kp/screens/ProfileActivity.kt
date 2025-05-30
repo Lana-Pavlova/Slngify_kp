@@ -47,10 +47,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +76,7 @@ import com.example.slngify_kp.viewmodel.ProgressViewModel
 import com.example.slngify_kp.viewmodel.UserProgress
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.firestore
 
 
 class ProfilePageActivity : ComponentActivity() {
@@ -103,20 +106,39 @@ fun ProfilePage(navController: NavHostController) {
     var showAuthForm by remember { mutableStateOf(false) }
     var isRegistering by remember { mutableStateOf(false) }
 
-    var userName by remember { mutableStateOf("Your name") }
-    var userEmail by remember { mutableStateOf("your@email.com") }
+    //var userName by remember { mutableStateOf("Your name") } // Убираем значения по умолчанию
+    //var userEmail by remember { mutableStateOf("your@email.com") } // Убираем значения по умолчанию
+
     val userId = Firebase.auth.currentUser?.uid
     val context = LocalContext.current
 
     var selectedItem by remember { mutableStateOf("profilePage") }
 
-    LaunchedEffect(userId) {
-        val auth = Firebase.auth
-        val currentUser = auth.currentUser
+    //val auth = Firebase.auth // Переносим сюда чтобы можно было юзать в LaunchedEffect
+    //val db = Firebase.firestore // Переносим сюда чтобы можно было юзать в LaunchedEffect
 
-        if (currentUser != null) {
-            userName = currentUser.displayName ?: "Имя пользователя"
-            userEmail = currentUser.email ?: "email"
+    //val userNameState = remember { mutableStateOf("") }
+    //val userEmailState = remember { mutableStateOf("") }
+
+    // Состояния для хранения имени и email пользователя
+    val userNameState = remember { mutableStateOf("") }
+    val userEmailState = remember { mutableStateOf("") }
+
+    LaunchedEffect(key1 = userId) {
+        if (userId != null) {
+            val userDocRef = Firebase.firestore.collection("users").document(userId)
+            userDocRef.get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        userNameState.value = document.getString("displayName") ?: ""
+                        userEmailState.value = document.getString("email") ?: ""
+                    } else {
+                        Log.d("Firebase", "No such document")
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    Log.d("Firebase", "get failed with ", exception)
+                }
         }
     }
 
@@ -132,8 +154,8 @@ fun ProfilePage(navController: NavHostController) {
         ) { padding ->
             ProfileContent(
                 paddingValues = padding,
-                userName = userName,
-                userEmail = userEmail,
+                userName = userNameState.value, // Передаем значения из состояний
+                userEmail = userEmailState.value, // Передаем значения из состояний
                 showAuthorInfo = showAuthorInfo,
                 showAuthForm = showAuthForm,
                 isRegistering = isRegistering,
@@ -142,8 +164,8 @@ fun ProfilePage(navController: NavHostController) {
                 onShowAuthorInfoChanged = { showAuthorInfo = it },
                 onShowAuthFormChanged = { showAuthForm = it },
                 onIsRegisteringChanged = { isRegistering = it },
-                onUserNameChanged = { userName = it },
-                onUserEmailChanged = { userEmail = it },
+                onUserNameChanged = { userNameState.value = it }, // Обновляем состояния
+                onUserEmailChanged = { userEmailState.value = it }, // Обновляем состояния
                 onSignOutClick = { authViewModel.signOutUser(navController) },
                 context = context,
                 newLessonsCompleted = newLessonsCompleted,
@@ -256,7 +278,7 @@ fun StatisticsSection(newLessonsCompleted: Int, totalLessons: Int) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Statistics",
+            text = "Статистика",
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -266,12 +288,12 @@ fun StatisticsSection(newLessonsCompleted: Int, totalLessons: Int) {
             StatisticCard(
                 icon = Icons.Default.Check,
                 count = newLessonsCompleted,
-                label = "New lessons completed"
+                label = "Пройденные уроки"
             )
             StatisticCard(
                 icon = Icons.Default.Check,
                 count = totalLessons,
-                label = "Total lessons"
+                label = "Всего уроков"
             )
         }
     }
@@ -344,8 +366,8 @@ fun AuthForm(onRegisterClick: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    val isLoading by authViewModel.loginLoading.observeAsState(false)
-    val errorMessage = authViewModel.loginError.observeAsState(initial = null)
+    val isLoading by authViewModel.loginLoading.collectAsState(false)
+    val errorMessage = authViewModel.loginError.collectAsState(initial = null)
     val errorMessageValue = errorMessage.value
     val context = LocalContext.current
 
@@ -442,17 +464,25 @@ fun AuthSection(
         }
     }
 }
+
 @Composable
 fun AuthorInfo(
     initialName: String,
     initialEmail: String,
-    onSave: (String, String, Boolean, Boolean) -> Unit
+    viewModel: AuthViewModel,
+    onSave: (Boolean) -> Unit
 ) {
-    var name by remember { mutableStateOf(initialName) }
-    var email by remember { mutableStateOf(initialEmail) }
-    var updateName by remember { mutableStateOf(false) }
-    var updateEmail by remember { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf(initialName) }
+    var email by rememberSaveable { mutableStateOf(initialEmail) }
+    var isEditing by rememberSaveable { mutableStateOf(false) }
+    var password by rememberSaveable { mutableStateOf("") }
 
+    val loading by viewModel.updateDataLoading.collectAsState()
+    val success by viewModel.updateDataSuccess.collectAsState()
+    val error by viewModel.updateDataError.collectAsState()
+    val emailSent by viewModel.verificationEmailSent.collectAsState()
+
+    val context = LocalContext.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -465,7 +495,8 @@ fun AuthorInfo(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Имя") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isEditing
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
@@ -473,38 +504,96 @@ fun AuthorInfo(
                 onValueChange = { email = it },
                 label = { Text("Почта") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                enabled = isEditing
             )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Пароль") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = isEditing,
+                visualTransformation = PasswordVisualTransformation(),
+                isError = email.isNotEmpty() && password.isEmpty()
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Checkbox(checked = updateName, onCheckedChange = { updateName = it })
-                Text(text = "Изменить имя", style = MaterialTheme.typography.bodyMedium)
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Checkbox(checked = updateEmail, onCheckedChange = { updateEmail = it })
-                Text(text = "Изменить почту", style = MaterialTheme.typography.bodyMedium)
-            }
-
+            )
             Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    onSave(name, email, updateName, updateEmail)
-                },
-                modifier = Modifier.align(Alignment.End),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            Text(
+                text = "Чтобы обновить данные почты, вам необходимо подтвердить свой email.",
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {
+                viewModel.resendEmailVerification { success, message ->
+                    if (success) {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }) {
+                Text("Отправить письмо с подтверждением повторно")
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("Сохранить")
+                if (isEditing) {
+                    Button(
+                        onClick = {
+                            viewModel.updateUserData(
+                                name,
+                                email,
+                                name != initialName,
+                                email != initialEmail,
+                                password
+                            ) { isSuccessful ->
+                                if (isSuccessful) {
+                                    Toast.makeText(context, "Данные успешно обновлены", Toast.LENGTH_SHORT).show()
+                                    onSave(true)
+                                } else {
+                                    Toast.makeText(context, "Ошибка обновления данных", Toast.LENGTH_SHORT).show()
+                                    onSave(false)
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        enabled = !loading
+                    ) {
+                        Text("Сохранить")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            isEditing = true
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        )
+                    ) {
+                        Text("Редактировать")
+                    }
+                }
+            }
+            if (loading) {
+                CircularProgressIndicator()
+            }
+            if (error != null) {
+                Text(text = error!!, color = Color.Red)
+            }
+            if (emailSent) {
+                Text(text = "Письмо с подтверждением отправлено на ваш email", color = Color.Green)
+            }
+            if (success) {
+                Text(text = "Данные успешно обновлены!", color = Color.Green)
             }
         }
     }
@@ -521,50 +610,52 @@ fun AuthorInfoSection(
     context: Context
 ) {
     val authViewModel: AuthViewModel = viewModel()
-    val isLoading by authViewModel.updateDataLoading.observeAsState(false)
-    val errorMessage = authViewModel.updateDataError.observeAsState(initial = null)
-    val errorMessageValue = errorMessage.value
-    Button(
-        onClick = { onShowAuthorInfoChanged(!showAuthorInfo) },
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-    ) {
-        Text("Сведения об авторе")
-    }
+    val isLoading by authViewModel.updateDataLoading.collectAsState(false)
+    val verificationEmailSent by authViewModel.verificationEmailSent.collectAsState(initial = false)
+    val updateDataSuccess by authViewModel.updateDataSuccess.collectAsState(initial = false)
+    val nameState = remember { mutableStateOf(userName) }
+    val emailState = remember { mutableStateOf(userEmail) }
 
-    if (showAuthorInfo) {
-        if (isLoading) {
-            CircularProgressIndicator()
-        } else {
-            AuthorInfo(
-                initialName = userName,
-                initialEmail = userEmail,
-                onSave = { name, email, updateName, updateEmail ->
-                    authViewModel.updateUserData(name, email, updateName, updateEmail) { success, message ->
-                        if (success) {
-                            onUserNameChanged(name)
-                            onUserEmailChanged(email)
-                        } else {
-                            // Ошибки отображаются через errorMessage
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Button(
+            onClick = { onShowAuthorInfoChanged(!showAuthorInfo) },
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        ) {
+            Text("Сведения об авторе")
+        }
+
+        if (showAuthorInfo) {
+            if (isLoading) {
+                CircularProgressIndicator()
+            } else {
+                AuthorInfo(
+                    initialName = nameState.value,
+                    initialEmail = emailState.value,
+                    viewModel = authViewModel,
+                    onSave = { isSuccessful ->
+                        if (isSuccessful) {
+                            onUserNameChanged(nameState.value)
+                            onUserEmailChanged(emailState.value)
                         }
                     }
-                }
-            )
+                )
+            }
         }
-        if (errorMessageValue != null) {
-            Text(
-                text = errorMessageValue,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium
-            )
+
+        if (verificationEmailSent) {
+            Text(text = "Письмо с подтверждением отправлено на ваш email.", color = Color.Green)
+        }
+        if (updateDataSuccess) {
+            Text(text = "Данные успешно обновлены", color = Color.Green)
         }
     }
 }
-
-
 @Composable
 fun RegistrationForm(onRegisterComplete: () -> Unit) {
     val authViewModel: AuthViewModel = viewModel()
@@ -572,8 +663,8 @@ fun RegistrationForm(onRegisterComplete: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    val isLoading by authViewModel.registrationLoading.observeAsState(false)
-    val errorMessage = authViewModel.registrationError.observeAsState(initial = null)
+    val isLoading by authViewModel.registrationLoading.collectAsState(false)
+    val errorMessage = authViewModel.registrationError.collectAsState(initial = null)
     val errorMessageValue = errorMessage.value
     val context = LocalContext.current
 
