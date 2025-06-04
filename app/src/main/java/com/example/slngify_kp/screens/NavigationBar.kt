@@ -91,8 +91,8 @@ fun NavigationButton(
     ) {
         Icon(
             painter = painterResource(id = icon),
-            contentDescription = null, // Убираем описание
-            modifier = Modifier.size(70.dp), // Задаем размер иконки
+            contentDescription = null,
+            modifier = Modifier.size(75.dp), // Задаем размер иконки
             tint = Color.Unspecified
         )
     }

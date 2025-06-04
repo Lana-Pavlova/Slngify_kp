@@ -75,6 +75,7 @@ import com.example.slngify_kp.viewmodel.AuthViewModel
 import com.example.slngify_kp.viewmodel.ProgressViewModel
 import com.example.slngify_kp.viewmodel.UserProgress
 import com.google.firebase.Firebase
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 
@@ -106,23 +107,12 @@ fun ProfilePage(navController: NavHostController) {
     var showAuthForm by remember { mutableStateOf(false) }
     var isRegistering by remember { mutableStateOf(false) }
 
-    //var userName by remember { mutableStateOf("Your name") } // Убираем значения по умолчанию
-    //var userEmail by remember { mutableStateOf("your@email.com") } // Убираем значения по умолчанию
-
     val userId = Firebase.auth.currentUser?.uid
     val context = LocalContext.current
 
     var selectedItem by remember { mutableStateOf("profilePage") }
 
-    //val auth = Firebase.auth // Переносим сюда чтобы можно было юзать в LaunchedEffect
-    //val db = Firebase.firestore // Переносим сюда чтобы можно было юзать в LaunchedEffect
-
-    //val userNameState = remember { mutableStateOf("") }
-    //val userEmailState = remember { mutableStateOf("") }
-
-    // Состояния для хранения имени и email пользователя
     val userNameState = remember { mutableStateOf("") }
-    val userEmailState = remember { mutableStateOf("") }
 
     LaunchedEffect(key1 = userId) {
         if (userId != null) {
@@ -131,7 +121,6 @@ fun ProfilePage(navController: NavHostController) {
                 .addOnSuccessListener { document ->
                     if (document != null && document.exists()) {
                         userNameState.value = document.getString("displayName") ?: ""
-                        userEmailState.value = document.getString("email") ?: ""
                     } else {
                         Log.d("Firebase", "No such document")
                     }
@@ -154,8 +143,7 @@ fun ProfilePage(navController: NavHostController) {
         ) { padding ->
             ProfileContent(
                 paddingValues = padding,
-                userName = userNameState.value, // Передаем значения из состояний
-                userEmail = userEmailState.value, // Передаем значения из состояний
+                userName = userNameState.value,
                 showAuthorInfo = showAuthorInfo,
                 showAuthForm = showAuthForm,
                 isRegistering = isRegistering,
@@ -164,8 +152,7 @@ fun ProfilePage(navController: NavHostController) {
                 onShowAuthorInfoChanged = { showAuthorInfo = it },
                 onShowAuthFormChanged = { showAuthForm = it },
                 onIsRegisteringChanged = { isRegistering = it },
-                onUserNameChanged = { userNameState.value = it }, // Обновляем состояния
-                onUserEmailChanged = { userEmailState.value = it }, // Обновляем состояния
+                onUserNameChanged = { userNameState.value = it },
                 onSignOutClick = { authViewModel.signOutUser(navController) },
                 context = context,
                 newLessonsCompleted = newLessonsCompleted,
@@ -178,7 +165,6 @@ fun ProfilePage(navController: NavHostController) {
 fun ProfileContent(
     paddingValues: PaddingValues,
     userName: String,
-    userEmail: String,
     showAuthorInfo: Boolean,
     showAuthForm: Boolean,
     isRegistering: Boolean,
@@ -188,7 +174,6 @@ fun ProfileContent(
     onShowAuthFormChanged: (Boolean) -> Unit,
     onIsRegisteringChanged: (Boolean) -> Unit,
     onUserNameChanged: (String) -> Unit,
-    onUserEmailChanged: (String) -> Unit,
     onSignOutClick: () -> Unit,
     context: Context,
     newLessonsCompleted: Int,
@@ -204,16 +189,14 @@ fun ProfileContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ProfileHeader(userName = userName, userEmail = userEmail)
+        ProfileHeader(userName = userName)
         Spacer(modifier = Modifier.height(16.dp))
 
         AuthorInfoSection(
             showAuthorInfo = showAuthorInfo,
             userName = userName,
-            userEmail = userEmail,
             onShowAuthorInfoChanged = onShowAuthorInfoChanged,
             onUserNameChanged = onUserNameChanged,
-            onUserEmailChanged = onUserEmailChanged,
             context = context
         )
 
@@ -251,7 +234,10 @@ fun ProfileContent(
     }
 }
 @Composable
-fun ProfileHeader(userName: String, userEmail: String) {
+fun ProfileHeader(userName: String) {
+    // Получаем email из Auth
+    val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: "Email не найден"
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(16.dp)
@@ -468,21 +454,23 @@ fun AuthSection(
 @Composable
 fun AuthorInfo(
     initialName: String,
-    initialEmail: String,
     viewModel: AuthViewModel,
+    onNameChanged: (String) -> Unit,
     onSave: (Boolean) -> Unit
 ) {
     var name by rememberSaveable { mutableStateOf(initialName) }
-    var email by rememberSaveable { mutableStateOf(initialEmail) }
     var isEditing by rememberSaveable { mutableStateOf(false) }
+    var newEmail by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
 
     val loading by viewModel.updateDataLoading.collectAsState()
     val success by viewModel.updateDataSuccess.collectAsState()
     val error by viewModel.updateDataError.collectAsState()
-    val emailSent by viewModel.verificationEmailSent.collectAsState()
 
     val context = LocalContext.current
+
+    val email = viewModel.userEmail.collectAsState().value
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -498,11 +486,17 @@ fun AuthorInfo(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isEditing
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
+            Text(text = "Почта: $email")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Почта") },
+                value = newEmail,
+                onValueChange = { newEmail = it },
+                label = { Text("Новый email") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = isEditing
@@ -515,27 +509,9 @@ fun AuthorInfo(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 enabled = isEditing,
                 visualTransformation = PasswordVisualTransformation(),
-                isError = email.isNotEmpty() && password.isEmpty()
-
+                isError = newEmail.isNotEmpty() && password.isEmpty()
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Чтобы обновить данные почты, вам необходимо подтвердить свой email.",
-                color = Color.Gray,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = {
-                viewModel.resendEmailVerification { success, message ->
-                    if (success) {
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }) {
-                Text("Отправить письмо с подтверждением повторно")
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -543,20 +519,44 @@ fun AuthorInfo(
                 if (isEditing) {
                     Button(
                         onClick = {
-                            viewModel.updateUserData(
-                                name,
-                                email,
-                                name != initialName,
-                                email != initialEmail,
-                                password
-                            ) { isSuccessful ->
-                                if (isSuccessful) {
-                                    Toast.makeText(context, "Данные успешно обновлены", Toast.LENGTH_SHORT).show()
-                                    onSave(true)
-                                } else {
-                                    Toast.makeText(context, "Ошибка обновления данных", Toast.LENGTH_SHORT).show()
-                                    onSave(false)
+                            // Сначала обновляем имя (если оно изменилось)
+                            if (name != initialName) {
+                                viewModel.updateNameProfile(name) { isNameUpdateSuccessful ->
+                                    if (isNameUpdateSuccessful) {
+                                        onNameChanged(name) // Обновляем UI
+                                        // Теперь обновляем email (если он указан)
+                                        if (newEmail.isNotEmpty()) {
+                                            viewModel.changeEmail(newEmail, password) { isEmailChangeSuccessful ->
+                                                if (isEmailChangeSuccessful) {
+                                                    Toast.makeText(context, "Имя и email успешно обновлены!", Toast.LENGTH_SHORT).show()
+                                                    onSave(true)
+                                                } else {
+                                                    Toast.makeText(context, "Ошибка при обновлении email", Toast.LENGTH_SHORT).show()
+                                                    onSave(false)
+                                                }
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "Имя успешно обновлено!", Toast.LENGTH_SHORT).show()
+                                            onSave(true)
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "Ошибка при обновлении имени", Toast.LENGTH_SHORT).show()
+                                        onSave(false)
+                                    }
                                 }
+                            } else if (newEmail.isNotEmpty()) { // Если имя не изменилось, обновляем только email
+                                viewModel.changeEmail(newEmail, password) { isEmailChangeSuccessful ->
+                                    if (isEmailChangeSuccessful) {
+                                        Toast.makeText(context, "Email успешно обновлен!", Toast.LENGTH_SHORT).show()
+                                        onSave(true)
+                                    } else {
+                                        Toast.makeText(context, "Ошибка при обновлении email", Toast.LENGTH_SHORT).show()
+                                        onSave(false)
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Ничего не изменилось!", Toast.LENGTH_SHORT).show()
+                                onSave(true)
                             }
                         },
                         shape = RoundedCornerShape(8.dp),
@@ -570,9 +570,7 @@ fun AuthorInfo(
                     }
                 } else {
                     Button(
-                        onClick = {
-                            isEditing = true
-                        },
+                        onClick = { isEditing = true },
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary,
@@ -583,14 +581,23 @@ fun AuthorInfo(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = {
+                viewModel.resendEmailVerification { success, message ->
+                    if (success) {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }) {
+                Text("Отправить письмо с подтверждением повторно")
+            }
             if (loading) {
                 CircularProgressIndicator()
             }
             if (error != null) {
-                Text(text = error!!, color = Color.Red)
-            }
-            if (emailSent) {
-                Text(text = "Письмо с подтверждением отправлено на ваш email", color = Color.Green)
+                Text(text = error ?: "Неизвестная ошибка", color = Color.Red)
             }
             if (success) {
                 Text(text = "Данные успешно обновлены!", color = Color.Green)
@@ -598,23 +605,19 @@ fun AuthorInfo(
         }
     }
 }
-
 @Composable
 fun AuthorInfoSection(
     showAuthorInfo: Boolean,
     userName: String,
-    userEmail: String,
     onShowAuthorInfoChanged: (Boolean) -> Unit,
     onUserNameChanged: (String) -> Unit,
-    onUserEmailChanged: (String) -> Unit,
     context: Context
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val isLoading by authViewModel.updateDataLoading.collectAsState(false)
-    val verificationEmailSent by authViewModel.verificationEmailSent.collectAsState(initial = false)
     val updateDataSuccess by authViewModel.updateDataSuccess.collectAsState(initial = false)
     val nameState = remember { mutableStateOf(userName) }
-    val emailState = remember { mutableStateOf(userEmail) }
+    val userEmail by authViewModel.userEmail.collectAsState() // Получаем email из StateFlow
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
@@ -636,30 +639,24 @@ fun AuthorInfoSection(
             } else {
                 AuthorInfo(
                     initialName = nameState.value,
-                    initialEmail = emailState.value,
                     viewModel = authViewModel,
+                    onNameChanged = { newName ->
+                        nameState.value = newName
+                        onUserNameChanged(newName)
+                    },
                     onSave = { isSuccessful ->
-                        if (isSuccessful) {
-                            onUserNameChanged(nameState.value)
-                            onUserEmailChanged(emailState.value)
-                        }
                     }
                 )
             }
         }
-
-        if (verificationEmailSent) {
-            Text(text = "Письмо с подтверждением отправлено на ваш email.", color = Color.Green)
-        }
-        if (updateDataSuccess) {
-            Text(text = "Данные успешно обновлены", color = Color.Green)
-        }
     }
 }
+
 @Composable
 fun RegistrationForm(onRegisterComplete: () -> Unit) {
     val authViewModel: AuthViewModel = viewModel()
 
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -677,6 +674,14 @@ fun RegistrationForm(onRegisterComplete: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Имя") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -710,7 +715,7 @@ fun RegistrationForm(onRegisterComplete: () -> Unit) {
             } else {
                 Button(
                     onClick = {
-                        authViewModel.registerUser(email, password) { success, message ->
+                        authViewModel.registerUser(name, email, password) { success, message ->
                             if (success) {
                                 Toast.makeText(context, "Аккаунт создан", Toast.LENGTH_SHORT).show()
                                 onRegisterComplete()

@@ -38,6 +38,9 @@ class AuthViewModel : ViewModel() {
     val updateDataSuccess = MutableStateFlow(false)
     val verificationEmailSent = MutableStateFlow(false) //  для отслеживания отправки письма с подтверждением
 
+    private val _userEmail = MutableStateFlow(Firebase.auth.currentUser?.email ?: "")
+    val userEmail: StateFlow<String> = _userEmail.asStateFlow()
+
     private val _emailChangeConfirmationResult = MutableStateFlow<ResultState<String>>(ResultState.Idle)
     val emailChangeConfirmationResult: StateFlow<ResultState<String>> = _emailChangeConfirmationResult.asStateFlow()
     // Функция для обработки кода действия из ссылки
@@ -143,6 +146,7 @@ class AuthViewModel : ViewModel() {
     fun changeEmail(newEmail: String, password: String, onComplete: (Boolean) -> Unit) {
         updateDataLoading.value = true
         updateDataError.value = null
+        updateDataSuccess.value = false
 
         viewModelScope.launch {
             val user = auth.currentUser ?: run {
@@ -153,29 +157,40 @@ class AuthViewModel : ViewModel() {
             }
 
             try {
-                // 1. Re-authenticate user
-                val credential = EmailAuthProvider.getCredential(user.email!!, password)
-                user.reauthenticate(credential).await()
-
-                // 2. Update email
-                user.updateEmail(newEmail).await()
-
-                // 3. Send verification email
-                user.sendEmailVerification().await()
-                updateDataError.value = "Письмо с подтверждением отправлено на ваш новый email. Пожалуйста, подтвердите его."
-                onComplete(true)
+                // 1. Обновляем email в Firebase Authentication с подтверждением
+                val isUpdateSuccessful = updateFirebaseAuthProfile(newEmail, password)
+                if (isUpdateSuccessful) {
+                    updateDataLoading.value = false
+                    updateDataSuccess.value = true
+                    onComplete(true)
+                } else {
+                    updateDataLoading.value = false
+                    onComplete(false)
+                }
 
             } catch (e: FirebaseAuthInvalidCredentialsException) {
                 Log.e("AuthViewModel", "Invalid credentials", e)
+                updateDataLoading.value = false
                 updateDataError.value = "Неверный пароль."
+                onComplete(false)
+            } catch (e: FirebaseAuthRecentLoginRequiredException) {
+                Log.e("AuthViewModel", "Recent login required", e)
+                updateDataLoading.value = false
+                updateDataError.value = "Требуется повторный вход в аккаунт. Пожалуйста, выйдите и войдите снова."
+                onComplete(false)
+            } catch (e: FirebaseAuthUserCollisionException) {
+                Log.e("AuthViewModel", "Email already in use", e)
+                updateDataLoading.value = false
+                updateDataError.value = "Этот email уже используется."
                 onComplete(false)
             } catch (e: FirebaseAuthException) {
                 Log.e("AuthViewModel", "Firebase Auth error", e)
-                updateDataError.value = "Ошибка: ${e.message}"
+                updateDataLoading.value = false
+                updateDataError.value = "Ошибка Firebase: ${e.message}"
                 onComplete(false)
-            }
-            catch (e: Exception) {
+            } catch (e: Exception) {
                 Log.e("AuthViewModel", "Error changing email", e)
+                updateDataLoading.value = false
                 updateDataError.value = "Ошибка при смене email: ${e.message}"
                 onComplete(false)
             } finally {
@@ -183,60 +198,59 @@ class AuthViewModel : ViewModel() {
             }
         }
     }
-    fun registerUser(email: String, password: String, onComplete: (Boolean, String?) -> Unit) {
+
+    fun registerUser(name: String, email: String, password: String, onComplete: (Boolean, String) -> Unit) {
         registrationLoading.value = true
         registrationError.value = null
-        registrationSuccess.value = false
+        viewModelScope.launch {
+            try {
+                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                val user = result.user
+                if (user != null) {
+                    // Обновляем displayName пользователя
+                    val profileUpdates = UserProfileChangeRequest.Builder()
+                        .setDisplayName(name)
+                        .build()
+                    user.updateProfile(profileUpdates).await()
 
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result.user
-                    user?.let {
-                        it.sendEmailVerification()
-                            .addOnCompleteListener { verificationTask ->
-                                if (verificationTask.isSuccessful) {
-                                    val userDocRef = db.collection("users").document(it.uid)
-                                    userDocRef.set(
-                                        mapOf(
-                                            "email" to email,
-                                            "displayName" to "",
-                                            "isEmailVerified" to false
-                                        )
-                                    ).addOnCompleteListener { firestoreTask ->
-                                        registrationLoading.value = false
-                                        if (firestoreTask.isSuccessful) {
-                                            registrationSuccess.value = true
-                                            onComplete(true, "Регистрация успешна. Пожалуйста, подтвердите свой email.")
-                                        } else {
-                                            registrationError.value = firestoreTask.exception?.message
-                                                ?: "Failed to add user data"
-                                            registrationSuccess.value = false
-                                            onComplete(
-                                                false,
-                                                firestoreTask.exception?.message ?: "Failed to add user data"
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    registrationLoading.value = false
-                                    registrationError.value = verificationTask.exception?.message
-                                        ?: "Failed to send verification email"
-                                    registrationSuccess.value = false
-                                    onComplete(
-                                        false,
-                                        verificationTask.exception?.message ?: "Failed to send verification email"
-                                    )
-                                }
-                            }
-                    }
+                    user.sendEmailVerification().await()
+
+                    // Создаем запись о пользователе в Firestore
+                    createUserInFirestore(user.uid, name)
+
+                    registrationLoading.value = false
+                    onComplete(true, "Регистрация прошла успешно. Проверьте свой email для подтверждения.")
                 } else {
                     registrationLoading.value = false
-                    registrationError.value = task.exception?.message ?: "Registration failed"
-                    registrationSuccess.value = false
-                    val errorMessage = task.exception?.message ?: "Регистрация не удалась"
-                    onComplete(false, errorMessage)
+                    onComplete(false, "Не удалось создать пользователя.")
                 }
+            } catch (e: FirebaseAuthException) {
+                registrationLoading.value = false
+                registrationError.value = "Ошибка регистрации: ${e.message}"
+                onComplete(false, "Ошибка регистрации: ${e.message}")
+            } catch (e: Exception) {
+                registrationLoading.value = false
+                registrationError.value = "Неизвестная ошибка: ${e.message}"
+                onComplete(false, "Неизвестная ошибка: ${e.message}")
+            }
+        }
+    }
+    private fun createUserInFirestore(uid: String, name: String) {
+        val user = hashMapOf(
+            "displayName" to name,
+            "completedLessonIds" to 0,
+            "completedSectionIds" to 0,
+            "achievementIds" to 0
+        )
+
+        db.collection("users")
+            .document(uid)
+            .set(user)
+            .addOnSuccessListener {
+                Log.d("AuthViewModel", "User added to Firestore")
+            }
+            .addOnFailureListener { e ->
+                Log.w("AuthViewModel", "Error adding user to Firestore", e)
             }
     }
     // Функция логина
@@ -244,6 +258,13 @@ class AuthViewModel : ViewModel() {
         loginLoading.value = true
         loginError.value = null
         loginSuccess.value = false
+
+        if (email.isBlank() || password.isBlank()) {
+            loginLoading.value = false
+            loginError.value = "Пожалуйста, заполните все поля."
+            onComplete(false, "Пожалуйста, заполните все поля.")
+            return
+        }
 
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
@@ -285,97 +306,78 @@ class AuthViewModel : ViewModel() {
     }
 
     // Функция обновления данных пользователя
-    fun updateUserData(
+    fun updateNameProfile(
         name: String,
-        email: String,
-        updateName: Boolean,
-        updateEmail: Boolean,
-        password: String,
         onComplete: (Boolean) -> Unit
     ) {
         updateDataLoading.value = true
         updateDataError.value = null
         updateDataSuccess.value = false
-        verificationEmailSent.value = false
 
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: run {
+            val user = auth.currentUser ?: run {
                 updateDataLoading.value = false
                 updateDataError.value = "User not authenticated"
                 onComplete(false)
                 return@launch
             }
 
-            // Обновление email
-            if (updateEmail) {
-                if (!isEmailUnique(email)) {
-                    updateDataLoading.value = false
-                    updateDataError.value = "Данный email уже используется"
-                    onComplete(false)
-                    return@launch
+            try {
+                if (name.isNotBlank()) {
+                    val profileUpdates = UserProfileChangeRequest.Builder()
+                        .setDisplayName(name)
+                        .build()
+                    user.updateProfile(profileUpdates).await()
+
+                    // Обновляем displayName в Firestore
+                    updateDisplayNameInFirestore(user.uid, name)
                 }
-
-                val isEmailUpdateSuccessful = updateFirebaseAuthProfile(email, password)
-                if (!isEmailUpdateSuccessful) {
-                    updateDataLoading.value = false
-                    onComplete(false)
-                    return@launch
-                }
-
-                // Показываем пользователю сообщение о необходимости подтверждения email
-                updateDataError.value = "Мы отправили письмо для подтверждения на $email. Пожалуйста, проверьте вашу почту и перейдите по ссылке в письме, чтобы завершить смену адреса."
-                verificationEmailSent.value = true
                 updateDataLoading.value = false
-                onComplete(false)
-                return@launch
-            }
-
-            // Обновление имени
-            if (updateName) {
-                val isNameUpdateSuccessful = updateNameProfile(name)
-                if (!isNameUpdateSuccessful) {
-                    updateDataLoading.value = false
-                    onComplete(false)
-                    return@launch
-                }
-            }
-
-            // Обновление данных в Firestore
-            if (updateName || updateEmail) { // Проверяем, нужно ли обновлять Firestore
-                val isFirestoreUpdateSuccessful = updateFirestore(userId, email, name)
-
-                updateDataLoading.value = false
-                updateDataSuccess.value = isFirestoreUpdateSuccessful
-                onComplete(isFirestoreUpdateSuccessful)
-            } else {
-                updateDataLoading.value = false
-                updateDataSuccess.value = true // Если ничего не обновлялось, считаем, что все прошло успешно
+                updateDataSuccess.value = true
                 onComplete(true)
+
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Error updating name profile", e)
+                updateDataLoading.value = false
+                updateDataError.value = "Ошибка при обновлении имени: ${e.message}"
+                onComplete(false)
             }
         }
+    }
+
+    private fun updateDisplayNameInFirestore(uid: String, displayName: String) {
+        db.collection("users")
+            .document(uid)
+            .update("displayName", displayName)
+            .addOnSuccessListener {
+                Log.d("AuthViewModel", "displayName updated in Firestore")
+            }
+            .addOnFailureListener { e ->
+                Log.w("AuthViewModel", "Error updating displayName in Firestore", e)
+            }
     }
 
     // Функция для проверки уникальности email
-    private suspend fun isEmailUnique(email: String): Boolean {
-        return try {
-            val result = auth.fetchSignInMethodsForEmail(email).await()
-            result.signInMethods?.isEmpty() ?: true
-        } catch (e: FirebaseAuthException) {
-            // Проверяем код ошибки
-            if (e.errorCode == "ERROR_INVALID_EMAIL") {
-                // Если email имеет неверный формат, считаем его уникальным
-                return true
-            } else {
-                // Если произошла другая ошибка, сообщаем об этом
-                Log.e("AuthViewModel", "Error checking email uniqueness", e)
-                return false
-            }
-        } catch (e: Exception) {
-            // Обрабатываем другие возможные исключения
-            Log.e("AuthViewModel", "Error checking email uniqueness", e)
-            return false
-        }
-    }
+//    private suspend fun isEmailUnique(email: String): Boolean {
+//        return try {
+//            val result = auth.fetchSignInMethodsForEmail(email).await()
+//            result.signInMethods?.isEmpty() ?: true
+//        } catch (e: FirebaseAuthException) {
+//            // Проверяем код ошибки
+//            if (e.errorCode == "ERROR_INVALID_EMAIL") {
+//                // Если email имеет неверный формат, считаем его уникальным
+//                return true
+//            } else {
+//                // Если произошла другая ошибка, сообщаем об этом
+//                Log.e("AuthViewModel", "Error checking email uniqueness", e)
+//                return false
+//            }
+//        } catch (e: Exception) {
+//            // Обрабатываем другие возможные исключения
+//            Log.e("AuthViewModel", "Error checking email uniqueness", e)
+//            return false
+//        }
+//    }
     // Функция для обновления профиля Firebase Authentication
     private suspend fun updateFirebaseAuthProfile(email: String, password: String): Boolean {
         val user = auth.currentUser ?: return false
@@ -385,7 +387,7 @@ class AuthViewModel : ViewModel() {
             val credential = EmailAuthProvider.getCredential(user.email!!, password)
             user.reauthenticate(credential).await()
 
-            // подтверждение нвоой почты после верификации
+            // подтверждение новой почты после верификации
             user.verifyBeforeUpdateEmail(email).await()
 
             verificationEmailSent.value = true
@@ -394,7 +396,8 @@ class AuthViewModel : ViewModel() {
             true
         } catch (e: FirebaseAuthRecentLoginRequiredException) {
             Log.e("AuthViewModel", "Re-authentication required", e)
-            updateDataError.value = "Требуется повторная аутентификация. Пожалуйста, введите свой пароль еще раз."
+            updateDataError.value =
+                "Требуется повторная аутентификация. Пожалуйста, введите свой пароль еще раз."
             false
         } catch (e: FirebaseAuthInvalidCredentialsException) {
             Log.e("AuthViewModel", "Invalid email format", e)
@@ -410,41 +413,40 @@ class AuthViewModel : ViewModel() {
             false
         }
     }
-    private suspend fun updateNameProfile(name: String): Boolean {
-        val user = auth.currentUser ?: return false
-        return try {
-            if (name.isNotBlank()) {
-                val profileUpdates = UserProfileChangeRequest.Builder()
-                    .setDisplayName(name)
-                    .build()
-                user.updateProfile(profileUpdates).await()
-            }
-            true
-        } catch (e: Exception) {
-            Log.e("AuthViewModel", "Error updating name profile", e)
-            updateDataError.value = "Ошибка при обновлении имени: ${e.message}"
-            false
-        }
-    }
-    // Функция для обновления данных в Firestore
-    private suspend fun updateFirestore(uid: String, email: String, name: String): Boolean {
-        return try {
-            val userRef = db.collection("users").document(uid)
-            val updates = mutableMapOf<String, Any?>()
-            if (email.isNotBlank()) {
-                updates["email"] = email
-            }
-            if (name.isNotBlank()) {
-                updates["displayName"] = name
-            } else {
-                updates["displayName"] = null // Разрешаем установить displayName в null
-            }
-            userRef.update(updates as Map<String, Any>).await()
-            true
-        } catch (e: Exception) {
-            Log.e("AuthViewModel", "Error updating Firestore", e)
-            updateDataError.value = "Ошибка при обновлении данных (Firestore): ${e.message}"
-            false
-        }
-    }
+//    private suspend fun updateNameProfile(name: String): Boolean {
+//        val user = auth.currentUser ?: return false
+//        return try {
+//            if (name.isNotBlank()) {
+//                val profileUpdates = UserProfileChangeRequest.Builder()
+//                    .setDisplayName(name)
+//                    .build()
+//                user.updateProfile(profileUpdates).await()
+//            }
+//            true
+//        } catch (e: Exception) {
+//            Log.e("AuthViewModel", "Error updating name profile", e)
+//            updateDataError.value = "Ошибка при обновлении имени: ${e.message}"
+//            false
+//        }
+//    }
+
+//    // Функция для обновления данных в Firestore
+//    private suspend fun updateFirestore(uid: String, name: String): Boolean {
+//        return try {
+//            val userRef = db.collection("users").document(uid)
+//            val updates = mutableMapOf<String, Any?>()
+//            if (name.isNotBlank()) {
+//                updates["displayName"] = name
+//            } else {
+//                updates["displayName"] = null
+//            }
+//            userRef.update(updates as Map<String, Any>).await()
+//            true
+//        } catch (e: Exception) {
+//            Log.e("AuthViewModel", "Error updating Firestore", e)
+//            updateDataError.value = "Ошибка при обновлении данных (Firestore): ${e.message}"
+//            false
+//        }
+//    }
+
 }

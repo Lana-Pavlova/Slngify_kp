@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -282,12 +283,25 @@ fun HomePageScreen(navController: NavController) {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     MainMenuButton(
+                        text = "Личный кабинет",
+                        iconRes = R.drawable.profile,
+                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
+                    ) {
+                        navController.navigate("profilePage")
+                    }
+                    MainMenuButton(
                         text = "Словарь",
                         iconRes = R.drawable.dictionary,
                         modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
                     ) {
                         navController.navigate("dictionaryPage")
                     }
+
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     MainMenuButton(
                         text = "Уроки",
                         iconRes = R.drawable.lessons,
@@ -295,25 +309,12 @@ fun HomePageScreen(navController: NavController) {
                     ) {
                         navController.navigate("lessonsList")
                     }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
                     MainMenuButton(
                         text = "Практика",
                         iconRes = R.drawable.practice,
                         modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
                     ) {
                         navController.navigate("sectionsList")
-                    }
-                    MainMenuButton(
-                        text = "Личный кабинет",
-                        iconRes = R.drawable.profile,
-                        modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp)
-                    ) {
-                        navController.navigate("profilePage")
                     }
                 }
             }
@@ -342,10 +343,14 @@ fun MainMenuButton(
         Image(
             painter = painterResource(id = iconRes),
             contentDescription = text,
-            modifier = Modifier.size(64.dp)
+            modifier = Modifier.size(76.dp)
         )
-        Text(text = text,
-            style = MaterialTheme.typography.bodyMedium,
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            ),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp)
         )
