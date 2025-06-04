@@ -147,35 +147,74 @@ class ProgressViewModel : ViewModel() {
             Log.e("ProgressViewModel", "Error loading sections", e)
         }
     }
-
-    fun awardAchievement(sectionId: String) {
+    fun completeLessonAndAwardAchievement(lessonId: String?, sectionId: String, resultText: String) {
         viewModelScope.launch {
-            val userId = auth.currentUser?.uid ?: return@launch
+            // Выдаем достижение
+            awardAchievement(sectionId)
+
+            // Отмечаем урок как пройденный, если результат хороший
+            if (resultText != "Похоже, что тебе нужно повторить материал." && lessonId != null) {
+                Log.d("ProgressViewModel", "Marking lesson completed: lessonId = $lessonId")
+                markLessonCompleted(lessonId)
+            } else {
+                Log.d("ProgressViewModel", "Not marking lesson completed: resultText = $resultText, lessonId = $lessonId")
+            }
+        }
+    }
+    fun awardAchievement(sectionId: String) {
+        Log.d("ProgressViewModel", "Starting awardAchievement for sectionId: $sectionId") // Начало
+
+        viewModelScope.launch {
+            val userId = auth.currentUser?.uid ?: run {
+                Log.w("ProgressViewModel", "User not authenticated")
+                return@launch // Прерываем корутину, если пользователь не аутентифицирован
+            }
+
+            Log.d("ProgressViewModel", "User ID: $userId")
+
             try {
                 val achievementId = getAchievementIdForSection(sectionId)
+                Log.d("ProgressViewModel", "Achievement ID for sectionId $sectionId: $achievementId")
                 if (achievementId == null) {
                     Log.w("ProgressViewModel", "No achievement found for sectionId: $sectionId")
                     return@launch
                 }
-                val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
-                if (!achievementDocument.exists()) {
-                    Log.e("ProgressViewModel", "Achievement document not found for achievementId: $achievementId")
-                    return@launch
+
+                val userDocument = firestore.collection("users").document(userId).get().await()
+                Log.d("ProgressViewModel", "User document retrieved")
+
+                val achievementIds = userDocument.get("achievementIds") as? List<String> ?: emptyList()
+                Log.d("ProgressViewModel", "Existing achievement IDs: $achievementIds")
+
+                if (achievementId !in achievementIds) {
+                    Log.d("ProgressViewModel", "Awarding achievement: $achievementId")
+                    firestore.collection("users").document(userId)
+                        .update("achievementIds", FieldValue.arrayUnion(achievementId)).await()
+                    Log.d("ProgressViewModel", "Achievement ID added to Firestore")
+
+                    // Получаем данные достижения
+                    val achievementDocument = firestore.collection("achievements").document(achievementId).get().await()
+                    if (!achievementDocument.exists()) {
+                        Log.e("ProgressViewModel", "Achievement document not found for achievementId: $achievementId")
+                        return@launch
+                    }
+                    val name = achievementDocument.getString("name") ?: ""
+                    val icon = achievementDocument.getString("icon") ?: ""
+                    val achievementData = AchievementData(name, icon)
+                    val currentAchievements = _userProgress.value.achievements.toMutableList()
+                    currentAchievements.add(achievementData) // Добавляем achievementData
+                    _userProgress.value = _userProgress.value.copy(achievements = currentAchievements)
+
+                    Log.d("ProgressViewModel", "Achievement awarded successfully")
+                } else {
+                    Log.d("ProgressViewModel", "Achievement already awarded: $achievementId")
                 }
-                val name = achievementDocument.getString("name") ?: ""
-                val icon = achievementDocument.getString("icon") ?: ""
-                val achievementData = AchievementData(name, icon)
-                firestore.collection("users").document(userId)
-                    .update("achievementIds", FieldValue.arrayUnion(achievementId)).await()
-                val currentAchievements = _userProgress.value.achievements.toMutableList()
-                currentAchievements.add(achievementData) // Добавляем achievementData
-                _userProgress.value = _userProgress.value.copy(achievements = currentAchievements)
             } catch (e: Exception) {
-                Log.e("ProgressViewModel", "Error awarding achievement", e)
+                Log.e("ProgressViewModel", "Error awarding achievement", e) // Выводим ошибку
             }
+            Log.d("ProgressViewModel", "Finished awardAchievement") // Конец
         }
     }
-
     private suspend fun getAchievementIdForSection(sectionId: String): String? {
         return try {
             val querySnapshot = firestore.collection("achievements")

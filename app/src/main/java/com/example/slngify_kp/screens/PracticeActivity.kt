@@ -532,18 +532,10 @@ fun ResultScreen(
             // 1. Отмечаем секцию как пройденную
             sectionsViewModel.markSectionCompleted(sectionId)
 
-            // 2. Выдаем достижение
-            viewModel.awardAchievement(sectionId)
+            // 2. Вызываем функцию из ViewModel
+            viewModel.completeLessonAndAwardAchievement(lessonId, sectionId, resultText)
 
-            // 3. Отмечаем урок как пройденный, если результат хороший
-            if (resultText != "Похоже, что тебе нужно повторить материал." && lessonId != null) {
-                Log.d("ResultScreen", "Marking lesson completed: lessonId = $lessonId")
-                viewModel.markLessonCompleted(lessonId)
-            } else {
-                Log.d("ResultScreen", "Not marking lesson completed: resultText = $resultText, lessonId = $lessonId")
-            }
-
-            // 4. Возвращаемся к списку разделов
+            // 3. Возвращаемся к списку разделов
             navController.popBackStack()
         }) {
             Text("Вернуться к списку разделов")
