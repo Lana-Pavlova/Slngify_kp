@@ -29,7 +29,6 @@ class AuthViewModel : ViewModel() {
 
     val registrationLoading = MutableStateFlow(false)
     val registrationError = MutableStateFlow<String?>(null)
-    val registrationSuccess = MutableStateFlow(false)
     val loginLoading = MutableStateFlow(false)
     val loginError = MutableStateFlow<String?>(null)
     val loginSuccess = MutableStateFlow(false)
@@ -157,7 +156,7 @@ class AuthViewModel : ViewModel() {
             }
 
             try {
-                // 1. Обновляем email в Firebase Authentication с подтверждением
+                // Обновляем email в Firebase Authentication с подтверждением
                 val isUpdateSuccessful = updateFirebaseAuthProfile(newEmail, password)
                 if (isUpdateSuccessful) {
                     updateDataLoading.value = false
@@ -167,7 +166,6 @@ class AuthViewModel : ViewModel() {
                     updateDataLoading.value = false
                     onComplete(false)
                 }
-
             } catch (e: FirebaseAuthInvalidCredentialsException) {
                 Log.e("AuthViewModel", "Invalid credentials", e)
                 updateDataLoading.value = false
@@ -357,27 +355,6 @@ class AuthViewModel : ViewModel() {
             }
     }
 
-    // Функция для проверки уникальности email
-//    private suspend fun isEmailUnique(email: String): Boolean {
-//        return try {
-//            val result = auth.fetchSignInMethodsForEmail(email).await()
-//            result.signInMethods?.isEmpty() ?: true
-//        } catch (e: FirebaseAuthException) {
-//            // Проверяем код ошибки
-//            if (e.errorCode == "ERROR_INVALID_EMAIL") {
-//                // Если email имеет неверный формат, считаем его уникальным
-//                return true
-//            } else {
-//                // Если произошла другая ошибка, сообщаем об этом
-//                Log.e("AuthViewModel", "Error checking email uniqueness", e)
-//                return false
-//            }
-//        } catch (e: Exception) {
-//            // Обрабатываем другие возможные исключения
-//            Log.e("AuthViewModel", "Error checking email uniqueness", e)
-//            return false
-//        }
-//    }
     // Функция для обновления профиля Firebase Authentication
     private suspend fun updateFirebaseAuthProfile(email: String, password: String): Boolean {
         val user = auth.currentUser ?: return false
@@ -413,40 +390,4 @@ class AuthViewModel : ViewModel() {
             false
         }
     }
-//    private suspend fun updateNameProfile(name: String): Boolean {
-//        val user = auth.currentUser ?: return false
-//        return try {
-//            if (name.isNotBlank()) {
-//                val profileUpdates = UserProfileChangeRequest.Builder()
-//                    .setDisplayName(name)
-//                    .build()
-//                user.updateProfile(profileUpdates).await()
-//            }
-//            true
-//        } catch (e: Exception) {
-//            Log.e("AuthViewModel", "Error updating name profile", e)
-//            updateDataError.value = "Ошибка при обновлении имени: ${e.message}"
-//            false
-//        }
-//    }
-
-//    // Функция для обновления данных в Firestore
-//    private suspend fun updateFirestore(uid: String, name: String): Boolean {
-//        return try {
-//            val userRef = db.collection("users").document(uid)
-//            val updates = mutableMapOf<String, Any?>()
-//            if (name.isNotBlank()) {
-//                updates["displayName"] = name
-//            } else {
-//                updates["displayName"] = null
-//            }
-//            userRef.update(updates as Map<String, Any>).await()
-//            true
-//        } catch (e: Exception) {
-//            Log.e("AuthViewModel", "Error updating Firestore", e)
-//            updateDataError.value = "Ошибка при обновлении данных (Firestore): ${e.message}"
-//            false
-//        }
-//    }
-
 }

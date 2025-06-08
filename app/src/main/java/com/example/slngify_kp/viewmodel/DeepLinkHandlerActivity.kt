@@ -11,7 +11,6 @@ import kotlinx.coroutines.launch
 
 class DeepLinkHandlerActivity : AppCompatActivity() {
 
-    // Получаем экземпляр AuthViewModel
     private lateinit var authViewModel: AuthViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,28 +60,21 @@ class DeepLinkHandlerActivity : AppCompatActivity() {
             authViewModel.emailChangeConfirmationResult.collect { result ->
                 when (result) {
                     is ResultState.Loading -> {
-                        // Покажи индикатор загрузки в UI
                         Log.d("DeepLinkHandler", "Applying action code - Loading...")
                     }
                     is ResultState.Success -> {
-                        // Email успешно подтвержден и изменен!
+                        // Email успешно подтвержден и изменен
                         val newEmail = result.data
                         Log.d("DeepLinkHandler", "Email change confirmed successfully to $newEmail!")
-                        // Покажи пользователю сообщение об успехе (например, через Toast или AlertDialog)
                         showSuccessAndFinish("Ваш email успешно изменен на $newEmail!")
-
-                        // Здесь же, если нужно, ViewModel могла бы обновить Firestore
-                        // (это лучше делать в ViewModel после успешного applyActionCode)
                     }
                     is ResultState.Error -> {
                         // Произошла ошибка при подтверждении
                         val errorMessage = result.message
                         Log.e("DeepLinkHandler", "Error applying action code: $errorMessage")
-                        // Покажи пользователю сообщение об ошибке
                         showErrorAndFinish("Не удалось подтвердить изменение email: $errorMessage")
                     }
                     is ResultState.Idle -> {
-                        // Начальное или сброшенное состояние, ничего не делаем
                     }
                 }
             }
@@ -93,19 +85,16 @@ class DeepLinkHandlerActivity : AppCompatActivity() {
     private fun showSuccessAndFinish(message: String) {
         // TODO: Реализовать показ сообщения пользователю, например, Toast или AlertDialog
         Log.i("DeepLinkHandler", "Success: $message")
-        // Возможно, перенаправить пользователя на главный экран или в настройки
-        finish() // Теперь безопасно завершить Activity
+        finish()
     }
 
     private fun showErrorAndFinish(message: String) {
         // TODO: Реализовать показ сообщения об ошибке пользователю
         Log.e("DeepLinkHandler", "Error: $message")
-        // Возможно, перенаправить пользователя на главный экран или в настройки
-        finish() // Теперь безопасно завершить Activity
+        finish()
     }
 }
 
-// Тебе понадобится класс для представления состояния
 sealed class ResultState<out T> {
     object Idle : ResultState<Nothing>()
     object Loading : ResultState<Nothing>()

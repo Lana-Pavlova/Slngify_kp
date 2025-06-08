@@ -36,7 +36,10 @@ data class Section(
     val title: String,
     var isCompleted: Boolean = false
 )
-
+data class TestResult(
+    val correctAnswers: Int,
+    val incorrectAnswers: Int
+)
 class ProgressViewModel : ViewModel() {
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -47,7 +50,6 @@ class ProgressViewModel : ViewModel() {
     val userProgress: StateFlow<UserProgress> = _userProgress.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     private val _lessonList = MutableStateFlow<List<Lesson>>(emptyList())
     val lessonList: StateFlow<List<Lesson>> = _lessonList.asStateFlow()

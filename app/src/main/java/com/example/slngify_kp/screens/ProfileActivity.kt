@@ -615,9 +615,7 @@ fun AuthorInfoSection(
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val isLoading by authViewModel.updateDataLoading.collectAsState(false)
-    val updateDataSuccess by authViewModel.updateDataSuccess.collectAsState(initial = false)
     val nameState = remember { mutableStateOf(userName) }
-    val userEmail by authViewModel.userEmail.collectAsState() // Получаем email из StateFlow
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally

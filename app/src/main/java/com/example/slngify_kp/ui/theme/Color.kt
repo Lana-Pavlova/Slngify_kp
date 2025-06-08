@@ -2,12 +2,12 @@ package com.example.slngify_kp.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val primaryLight = Color(0xFF006C4F)
-val onPrimaryLight = Color(0xFFFFFFFF)
+val onPrimaryLight = Color(0xFFA5D9B1)
 val primaryContainerLight = Color(0xFF26BA8D)
 val onPrimaryContainerLight = Color(0xFF001F14)
 val secondaryLight = Color(0xFF396754)
-val onSecondaryLight = Color(0xFFFFFFFF)
-val secondaryContainerLight = Color(0xFFBEF0D8)
+val onSecondaryLight = Color(0xFFA5D9B1)
+val secondaryContainerLight = Color(0xFFA5D9B1)
 val onSecondaryContainerLight = Color(0xFF235240)
 val tertiaryLight = Color(0xFF5A51B1)
 val onTertiaryLight = Color(0xFFFFFFFF)

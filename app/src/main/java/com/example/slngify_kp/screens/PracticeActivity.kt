@@ -67,6 +67,7 @@ import coil.size.Size
 import com.example.slngify_kp.R
 import com.example.slngify_kp.ui.theme.MyTheme
 import com.example.slngify_kp.viewmodel.ProgressViewModel
+import com.example.slngify_kp.viewmodel.TestResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -471,6 +472,8 @@ fun ResultScreen(
     onRetryQuestion: (Int) -> Unit,
     lessonId: String?
 ) {
+    val incorrectAnswers = numberOfQuestions - numberOfCorrectAnswers
+    val testResult = TestResult(correctAnswers = numberOfCorrectAnswers, incorrectAnswers = incorrectAnswers)
     val progress = if (numberOfQuestions > 0) numberOfCorrectAnswers.toFloat() / numberOfQuestions else 0f
     val sectionsViewModel: SectionsViewModel = viewModel()
     val viewModel: ProgressViewModel = viewModel()
@@ -495,10 +498,7 @@ fun ResultScreen(
         Spacer(
             modifier = Modifier.height(16.dp)
         )
-        CircularProgressIndicator(
-            progress = progress,
-            modifier = Modifier.size(100.dp)
-        )
+        BarChart(testResult = testResult)
         Spacer(
             modifier = Modifier.height(16.dp)
         )
@@ -540,6 +540,35 @@ fun ResultScreen(
         }) {
             Text("Вернуться к списку разделов")
         }
+    }
+}
+@Composable
+fun BarChart(testResult: TestResult) {
+    val totalAnswers = testResult.correctAnswers + testResult.incorrectAnswers
+    val correctPercentage = if (totalAnswers > 0) testResult.correctAnswers.toFloat() / totalAnswers else 0f
+    val incorrectPercentage = 1f - correctPercentage
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        // Неверные ответы (красный столбец)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(incorrectPercentage)
+                .background(Color.Red)
+        )
+        // Верные ответы (зеленый столбец)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(correctPercentage)
+                .background(Color.Green)
+        )
     }
 }
 @Composable
