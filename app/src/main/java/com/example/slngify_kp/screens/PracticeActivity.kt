@@ -1,6 +1,9 @@
 package com.example.slngify_kp.screens
 
 import android.util.Log
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -18,7 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -46,16 +52,24 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -343,33 +357,64 @@ fun SectionsScreen(navController: NavHostController) {
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SectionListItem(section: Section, navController: NavHostController, isUnlocked: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
-            .clickable (enabled = isUnlocked) {
-                if(isUnlocked){
-                    navController.navigate("sectionDetail/${section.sectionId}")
+            .padding(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface, // Всегда используем surface
+            contentColor = MaterialTheme.colorScheme.onSurface, // Всегда используем onSurface
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface
+        ),
+        onClick = {
+            if (isUnlocked) {
+                navController.navigate("sectionDetail/${section.sectionId}")
+            } else {
+                scope.launch {
+                    //Toast.makeText(context, "Этот раздел пока недоступен", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Этот раздел пока недоступен", Toast.LENGTH_SHORT).show()
                 }
-            },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Box (modifier = Modifier.fillMaxSize()){
-            Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-                Text(text = section.sectionTitle, style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = section.sectionDescription, style = MaterialTheme.typography.bodyMedium)
             }
-            if (!isUnlocked){
+        },
+        border = if (!isUnlocked) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier
+                .padding(16.dp)
+                .fillMaxSize()) {
+                Text(
+                    text = section.sectionTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = section.sectionDescription,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            if (!isUnlocked) { // Отображаем иконку замка, если урок *не* разблокирован
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Gray.copy(alpha = 0.7f)),
-                    contentAlignment = Alignment.Center
-                ){
-                    Icon(imageVector = Icons.Filled.Lock, contentDescription = "Locked")
+                        .align(Alignment.TopEnd) // Выравниваем в верхнем правом углу
+                        .padding(8.dp) // Добавляем отступ
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = "Заблокировано",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -473,8 +518,9 @@ fun ResultScreen(
     lessonId: String?
 ) {
     val incorrectAnswers = numberOfQuestions - numberOfCorrectAnswers
-    val testResult = TestResult(correctAnswers = numberOfCorrectAnswers, incorrectAnswers = incorrectAnswers)
+
     val progress = if (numberOfQuestions > 0) numberOfCorrectAnswers.toFloat() / numberOfQuestions else 0f
+
     val sectionsViewModel: SectionsViewModel = viewModel()
     val viewModel: ProgressViewModel = viewModel()
 
@@ -492,15 +538,18 @@ fun ResultScreen(
         Spacer(
             modifier = Modifier.height(16.dp)
         )
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            ResultCircle(number = numberOfCorrectAnswers, color = Color.Green)
+            ResultCircle(number = incorrectAnswers, color = Color.Red)
+        }
+        Spacer(
+            modifier = Modifier.height(16.dp)
+        )
         Text(
             "Правильных ответов: $numberOfCorrectAnswers из $numberOfQuestions"
-        )
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-        BarChart(testResult = testResult)
-        Spacer(
-            modifier = Modifier.height(16.dp)
         )
         if (incorrectQuestions.isNotEmpty()) {
             Text(
@@ -543,31 +592,26 @@ fun ResultScreen(
     }
 }
 @Composable
-fun BarChart(testResult: TestResult) {
-    val totalAnswers = testResult.correctAnswers + testResult.incorrectAnswers
-    val correctPercentage = if (totalAnswers > 0) testResult.correctAnswers.toFloat() / totalAnswers else 0f
-    val incorrectPercentage = 1f - correctPercentage
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Bottom
+fun ResultCircle(
+    number: Int,
+    color: Color,
+    size: Dp = 70.dp,
+    fontSize: TextUnit = 24.sp
+) {
+    Box(
+        contentAlignment = Alignment.Center
     ) {
-        // Неверные ответы (красный столбец)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(incorrectPercentage)
-                .background(Color.Red)
-        )
-        // Верные ответы (зеленый столбец)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(correctPercentage)
-                .background(Color.Green)
+        Canvas(modifier = Modifier.size(size)) {
+            drawCircle(
+                color = color,
+                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        Text(
+            text = number.toString(),
+            color = color,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -686,40 +730,66 @@ fun QuestionScreen(
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageViewerScreen(imageUrl: String) {
+fun ImageViewerScreen(imageUrl: String, navController: NavHostController) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var showDialog by remember { mutableStateOf(true) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    offset += pan
+
+    if (showDialog) {
+        Dialog(onDismissRequest = {
+            showDialog = false
+            navController.popBackStack()
+        }) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface
+            ) {
+
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 5f)
+                                offset += pan
+                            }
+                        }
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Inside,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.medium)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
+                    )
+
+                    IconButton(
+                        onClick = {
+                            showDialog = false
+                            navController.popBackStack()
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Close, contentDescription = "Закрыть") // Убрали текст
+                    }
                 }
             }
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(imageUrl)
-                .crossfade(true)
-                .size(Size.ORIGINAL)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offset.x
-                    translationY = offset.y
-                }
-        )
+        }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

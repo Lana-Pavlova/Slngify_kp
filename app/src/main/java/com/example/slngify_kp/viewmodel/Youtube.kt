@@ -83,7 +83,6 @@ fun YouTubeWebView(videoId: String, onError: (String) -> Unit) {
             }
         },
         update = { view ->
-            // You can use update to update parameters if needed
         },
         modifier = Modifier.fillMaxSize()
     )

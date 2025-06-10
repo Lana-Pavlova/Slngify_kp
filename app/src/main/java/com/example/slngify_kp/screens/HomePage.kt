@@ -138,10 +138,8 @@ fun NavigationComponent() {
                 SectionDetailScreen(sectionId = sectionId, navController = navController)
             }
             composable("imageViewer/{imageUrl}") { backStackEntry ->
-                shouldShowBottomBar.value = false
-                selectedItem.value = ""
                 val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
-                ImageViewerScreen(imageUrl = imageUrl)
+                ImageViewerScreen(imageUrl = imageUrl, navController = navController)
             }
         }
     }
